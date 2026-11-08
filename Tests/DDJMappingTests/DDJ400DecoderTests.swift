@@ -35,6 +35,17 @@ final class DDJ400DecoderTests: XCTestCase {
         XCTAssertEqual(decode(0x87, 0x05, 0x00), DDJEvent(.pad(.left, 5), .press(false), padMode: .hotCue))
     }
 
+    func testPadModeButtons() {                                    // (recorded on a DDJ-400)
+        XCTAssertEqual(decode(0x90, 0x1B, 0x7F), DDJEvent(.padModeButton(.left, .hotCue), .press(true)))
+        XCTAssertEqual(decode(0x90, 0x6D, 0x7F), DDJEvent(.padModeButton(.left, .beatLoop), .press(true)))
+        XCTAssertEqual(decode(0x91, 0x20, 0x7F), DDJEvent(.padModeButton(.right, .beatJump), .press(true)))
+        XCTAssertEqual(decode(0x91, 0x22, 0x00), DDJEvent(.padModeButton(.right, .sampler), .press(false)))
+        XCTAssertEqual(decode(0x90, 0x69, 0x7F), DDJEvent(.padModeButton(.left, .keyboard), .press(true), shifted: true))
+        XCTAssertEqual(decode(0x90, 0x1E, 0x7F), DDJEvent(.padModeButton(.left, .padFX1), .press(true), shifted: true))
+        XCTAssertEqual(decode(0x90, 0x6B, 0x7F), DDJEvent(.padModeButton(.left, .padFX2), .press(true), shifted: true))
+        XCTAssertEqual(decode(0x90, 0x6F, 0x7F), DDJEvent(.padModeButton(.left, .keyShift), .press(true), shifted: true))
+    }
+
     func testSyncLongPressIsSync() {
         XCTAssertEqual(decode(0x90, 0x5C, 0x7F), DDJEvent(.sync(.left), .press(true)))
         XCTAssertEqual(decode(0x91, 0x5C, 0x00), DDJEvent(.sync(.right), .press(false)))

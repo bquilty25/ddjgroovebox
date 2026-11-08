@@ -203,7 +203,11 @@ final class AppController: NSObject, NSWindowDelegate {
             instrument.strip.isHidden = hide.contains("screen")
         }
         window.center()
-        window.setFrameAutosaveName("DDJGrooveboxMain")    // size and position remembered
+        if let s = ProcessInfo.processInfo.environment["DDJ_WINDOW"]?.split(separator: "x").compactMap({ Double($0) }), s.count == 2 {
+            window.setContentSize(NSSize(width: s[0], height: s[1]))   // (scripted runs: DDJ_WINDOW=1512x945)
+        } else {
+            window.setFrameAutosaveName("DDJGrooveboxMain")    // size and position remembered
+        }
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(layout)
     }

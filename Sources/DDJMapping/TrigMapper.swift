@@ -127,7 +127,8 @@ public final class TrigMapper {
             return perfOn ? [perfAction(on: true)] : []
         case (.beatLeft, .press(true)): perfDivision = max(0, perfDivision - 1); return perfOn ? [perfAction(on: true)] : []
         case (.beatRight, .press(true)): perfDivision = min(5, perfDivision + 1); return perfOn ? [perfAction(on: true)] : []
-        case (.fxOnOff, .press(let down)): perfOn = down; return [perfAction(on: down)]
+        case (.fxOnOff, .press(true)): perfOn.toggle(); return [perfAction(on: perfOn)]   // a toggle: press on, press off
+        case (.fxOnOff, .press(false)): return []
         case (.fxChannel(let n), .press(true)): setPerfTarget(n); return perfOn ? [perfAction(on: true)] : []
         case (.fxLevel, .absolute(let v)): perfAmount = v; return perfOn ? [perfAction(on: true)] : []
         case (.trim(let d), .absolute(let v)): return [.deckDrive(deck: d.rawValue, drive: v)]

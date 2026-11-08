@@ -257,13 +257,15 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(send(.tempo(.left), .absolute(1.0)), [.tempo(200)], "picked up: towards you is faster")
     }
 
-    func testPerfFXHoldDivisionTarget() {
+    func testPerfFXToggleDivisionTarget() {
         send(.fxSelect, .press(true))                                // STUTTER
         send(.beatRight, .press(true))                               // 1/4
         send(.fxChannel(0), .press(true))                            // deck A
         XCTAssertEqual(send(.fxOnOff, .press(true)), [.perf(fx: 1, division: 3, target: 0, on: true, amount: 0.6)])
+        XCTAssertEqual(send(.fxOnOff, .press(false)), [], "a toggle: letting go keeps it on")
         XCTAssertEqual(send(.fxLevel, .absolute(0.9)), [.perf(fx: 1, division: 3, target: 0, on: true, amount: 0.9)])
-        XCTAssertEqual(send(.fxOnOff, .press(false)), [.perf(fx: 1, division: 3, target: 0, on: false, amount: 0.9)])
+        XCTAssertEqual(send(.fxOnOff, .press(true)), [.perf(fx: 1, division: 3, target: 0, on: false, amount: 0.9)], "pressed again: off")
+        XCTAssertEqual(send(.fxOnOff, .press(false)), [])
     }
 
     func testMachineFromBrowseOnSrcPage() {

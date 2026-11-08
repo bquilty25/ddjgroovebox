@@ -360,7 +360,7 @@ extension DDJ400View {
         for deck in Deck.allCases {
             let x0: CGFloat = deck == .left ? 0 : Self.rightDeckX
             drawText(deck == .left ? "1" : "2", size: 16, SloopStyle.fg2, x: x0 + 10, y: 13, align: .left)
-            drawLabel("CUE/LOOP CALL", x: x0 + 243, y: 100)
+            drawLabel("CUE/LOOP CALL", x: x0 + Self.deckShift + 243, y: 100)
         }
 
         // beat FX group

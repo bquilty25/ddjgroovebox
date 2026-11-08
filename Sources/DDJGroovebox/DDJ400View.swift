@@ -210,14 +210,14 @@ public struct DeckTrackFace: Equatable {
 
     /// Where the columns start, as fractions of the width: left deck 0, mixer, right deck. The body is open at the
     /// top so a view above with the same columns (s1 fill, 1 pt `line` borders) joins it.
-    public nonisolated static let columnFractions: (mixerStart: CGFloat, rightStart: CGFloat) = (mixerX / designW, rightDeckX / designW)
+    public nonisolated static var columnFractions: (mixerStart: CGFloat, rightStart: CGFloat) { (mixerX / designW, rightDeckX / designW) }
 
     // MARK: - Invalidation: only what changed is redrawn (meters, playhead and levels change many times a second)
 
     nonisolated static let meterSegmentCount = 15
-    nonisolated static let meterRect = CGRect(x: mixerMid - 10, y: 222, width: 20, height: 178)
+    nonisolated static var meterRect: CGRect { CGRect(x: mixerMid - 10, y: 222, width: 20, height: 178) }
     /// the header (or status line) at the top of the mixer
-    nonisolated static let statusRect = CGRect(x: mixerX + 2, y: 0, width: rightDeckX - mixerX - 4, height: 46)
+    nonisolated static var statusRect: CGRect { CGRect(x: mixerX + 2, y: 0, width: rightDeckX - mixerX - 4, height: 46) }
 
     nonisolated static func segments(_ v: Double) -> Int {
         Int((clamp(v) * Double(meterSegmentCount)).rounded(.toNearestOrAwayFromZero))
@@ -368,19 +368,44 @@ public struct DeckTrackFace: Equatable {
         updateAccessibilityFrames()
     }
 
-    // MARK: - Layout (design space 1240 x 700, y down: the DDJ-400's 482 x 272 mm; decks 440 wide, mixer 360)
+    // MARK: - Layout (design space 1240 x 700 at the least, y down: the DDJ-400's 482 x 272 mm; decks 440 wide, mixer
+    // 360). A wider window stretches the design up to `maxDesignW`: 40 % of the extra to the mixer, 30 % to each deck.
 
-    nonisolated static let designW: CGFloat = 1240
+    nonisolated static let minDesignW: CGFloat = 1240
+    nonisolated static let maxDesignW: CGFloat = 1720
+    /// the current design width (one window: set by `setDesignWidth`)
+    nonisolated(unsafe) private(set) static var designW: CGFloat = minDesignW
     nonisolated static let designH: CGFloat = 700
-    nonisolated static let mixerX: CGFloat = 440
-    nonisolated static let rightDeckX: CGFloat = 800
-    /// the mixer's columns: left (the name, HEADPHONES) 440-500, middle (the channels) 500-710, right (MASTER, BEAT FX)
-    nonisolated static let leftColX: CGFloat = 500
-    nonisolated static let rightColX: CGFloat = 710
-    nonisolated static let mixerMid: CGFloat = (leftColX + rightColX) / 2
-    nonisolated static let leftColMid: CGFloat = (mixerX + leftColX) / 2
-    nonisolated static let rightColMid: CGFloat = (rightColX + rightDeckX) / 2
-    nonisolated static let beatFXBox = CGRect(x: rightColX + 4, y: 222, width: rightDeckX - rightColX - 8, height: 350)
+    nonisolated static var extraW: CGFloat { designW - minDesignW }
+    nonisolated static var deckW: CGFloat { (440 + extraW * 0.3).rounded() }
+    /// a deck's controls (jog, pads, transport) move to the middle of its extra width; BEAT SYNC and TEMPO stay at its edge
+    nonisolated static var deckShift: CGFloat { ((deckW - 440) / 2).rounded() }
+    nonisolated static var mixerX: CGFloat { deckW }
+    nonisolated static var rightDeckX: CGFloat { designW - deckW }
+    nonisolated static var mixerExtra: CGFloat { rightDeckX - mixerX - 360 }
+    /// the mixer's columns: left (the name, HEADPHONES), middle (the channels), right (MASTER, BEAT FX)
+    nonisolated static var leftColX: CGFloat { (mixerX + 60 + mixerExtra * 0.2).rounded() }
+    nonisolated static var rightColX: CGFloat { (rightDeckX - 90 - mixerExtra * 0.2).rounded() }
+    nonisolated static var mixerMid: CGFloat { (leftColX + rightColX) / 2 }
+    nonisolated static var leftColMid: CGFloat { (mixerX + leftColX) / 2 }
+    nonisolated static var rightColMid: CGFloat { (rightColX + rightDeckX) / 2 }
+    /// half the distance between the two channel strips
+    nonisolated static var channelHalf: CGFloat { (50 + mixerExtra * 0.15).rounded() }
+    nonisolated static var beatFXBox: CGRect { CGRect(x: rightColX + 4, y: 222, width: rightDeckX - rightColX - 8, height: 350) }
+
+    /// Stretch the drawing to this design width (clamped to minDesignW...maxDesignW): the layout follows.
+    func setDesignWidth(_ w: CGFloat) {
+        let nw = min(Self.maxDesignW, max(Self.minDesignW, w.rounded()))
+        guard nw != Self.designW else { return }
+        Self.designW = nw
+        items = Self.makeLayout()
+        indexByControl = Self.index(items)
+        staticCache = nil
+        accessibilityItems = nil
+        backdropNeedsDisplay()
+        needsDisplay = true
+        geometryChanged()
+    }
 
     struct Item: Sendable {
         enum Kind: Sendable {
@@ -410,12 +435,14 @@ public struct DeckTrackFace: Equatable {
         var valuePos: ValuePos
     }
 
-    let items: [Item] = DDJ400View.makeLayout()
-    private(set) lazy var indexByControl: [DDJControl: Int] = {
+    private(set) var items: [Item] = DDJ400View.makeLayout()
+    private(set) lazy var indexByControl: [DDJControl: Int] = Self.index(items)
+
+    private static func index(_ items: [Item]) -> [DDJControl: Int] {
         var d: [DDJControl: Int] = [:]
         for (i, it) in items.enumerated() { d[it.control] = i }
         return d
-    }()
+    }
 
     /// the item that draws a control (aliases: BROWSE's press, a jog's touch, a mode button's shifted mode)
     func itemIndex(for c: DDJControl) -> Int? {
@@ -460,7 +487,8 @@ public struct DeckTrackFace: Equatable {
             out.append(Item(control: c, kind: k, rect: r, label: label, labelPos: lp, caption: cp, valuePos: v))
         }
         for deck in Deck.allCases {
-            let x0: CGFloat = deck == .left ? 0 : rightDeckX
+            let origin: CGFloat = deck == .left ? 0 : rightDeckX
+            let x0 = origin + deckShift, edge = origin + deckW   // the controls' block; the deck's outer edge
             let capY: CGFloat = 36
             // top row: loop section and BEAT SYNC
             add(.loopIn(deck), .round, circle(x0 + 44, 72, 19), "IN/4BEAT", .below, .at(CGPoint(x: x0 + 44, y: capY), width: 54), value: .inside)
@@ -468,11 +496,11 @@ public struct DeckTrackFace: Equatable {
             add(.reloop(deck), .round, circle(x0 + 154, 72, 14), "RELOOP/EXIT", .below, .at(CGPoint(x: x0 + 154, y: capY), width: 50), value: .inside)
             add(.callLeft(deck), .button, centered(x0 + 212, 72, 26, 24), "\u{25C0}", .inside, .at(CGPoint(x: x0 + 212, y: capY), width: 58))
             add(.callRight(deck), .button, centered(x0 + 274, 72, 26, 24), "\u{25B6}", .inside, .at(CGPoint(x: x0 + 274, y: capY), width: 58))
-            add(.sync(deck), .round, circle(x0 + 398, 72, 19), "BEAT SYNC", .below, .at(CGPoint(x: x0 + 398, y: capY), width: 80), value: .inside)
+            add(.sync(deck), .round, circle(edge - 42, 72, 19), "BEAT SYNC", .below, .at(CGPoint(x: edge - 42, y: capY), width: 80), value: .inside)
             // jog and tempo
             add(.jog(deck), .jog, circle(x0 + 200, 258, 128), "JOG", .none, .inside, value: .inside)
-            add(.tempo(deck), .vfader, CGRect(x: x0 + 395, y: 288, width: 28, height: 330), "TEMPO", .below,
-                .at(CGPoint(x: x0 + 409, y: 250), width: 62))
+            add(.tempo(deck), .vfader, CGRect(x: edge - 45, y: 288, width: 28, height: 330), "TEMPO", .below,
+                .at(CGPoint(x: edge - 31, y: 250), width: 62))
             // transport column
             add(.shift(deck), .shiftButton, centered(x0 + 46, 452, 52, 22), "SHIFT", .inside, .above(width: 84))
             add(.cue(deck), .round, circle(x0 + 46, 530, 30), "CUE", .inside, .above(width: 86))
@@ -493,7 +521,7 @@ public struct DeckTrackFace: Equatable {
         // the mixer, as on the DDJ-400: three columns. Left: the name and HEADPHONES; middle: the two channel strips
         // (the meter between them), the channel faders and the crossfader; right: MASTER and BEAT FX. BROWSE and the
         // LOAD buttons sit above the channel strips.
-        let mid = mixerMid, chL = mixerMid - 50, chR = mixerMid + 50
+        let mid = mixerMid, chL = mixerMid - channelHalf, chR = mixerMid + channelHalf
         add(.load(.left), .button, centered(chL - 10, 80, 46, 22), "LOAD", .inside, .at(CGPoint(x: chL - 10, y: 56), width: 70))
         add(.browse, .browse, circle(mid, 80, 18), "BROWSE", .below, .at(CGPoint(x: mid, y: 56), width: 70))
         add(.load(.right), .button, centered(chR + 10, 80, 46, 22), "LOAD", .inside, .at(CGPoint(x: chR + 10, y: 56), width: 70))

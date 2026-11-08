@@ -100,6 +100,16 @@ public struct DDJ400Decoder {
         case 0x36: return (.jogTouch(d), false)
         case 0x67: return (.jogTouch(d), true)
         case 0x3F: return (.shift(d), false)
+        // the pad mode buttons (recorded on a DDJ-400; not in Mixxx's mapping): the controller switches its pads itself
+        // and says which mode it chose
+        case 0x1B: return (.padModeButton(d, .hotCue), false)
+        case 0x6D: return (.padModeButton(d, .beatLoop), false)
+        case 0x20: return (.padModeButton(d, .beatJump), false)
+        case 0x22: return (.padModeButton(d, .sampler), false)
+        case 0x69: return (.padModeButton(d, .keyboard), true)
+        case 0x1E: return (.padModeButton(d, .padFX1), true)
+        case 0x6B: return (.padModeButton(d, .padFX2), true)
+        case 0x6F: return (.padModeButton(d, .keyShift), true)
         default: return nil
         }
     }

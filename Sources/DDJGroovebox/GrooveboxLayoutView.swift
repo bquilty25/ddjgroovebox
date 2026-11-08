@@ -50,11 +50,21 @@ final class GrooveboxLayoutView: NSView {
         super.layout()
         let backing = window?.backingScaleFactor ?? 2
         let availW = bounds.width - 2 * margin, availH = bounds.height - 2 * margin
-        // the widest layout that fits: the drawing keeps its shape, the strip asks for its height
-        var w = availW
-        while w > 200 && strip.preferredHeight(forWidth: w, backing: backing) + w / Self.ddjAspect > availH { w -= 4 }
+        // the widest layout that fits: the strip asks for its height, the drawing takes the rest, stretched wider than
+        // the controller's shape when the window is wide (up to the design's widest), never narrower
+        let minAspect = DDJ400View.minDesignW / DDJ400View.designH, maxAspect = DDJ400View.maxDesignW / DDJ400View.designH
+        var w = availW, dh: CGFloat = 0
+        while w > 200 {
+            let room = availH - strip.preferredHeight(forWidth: w, backing: backing)
+            if room > 0 && w / room <= maxAspect {
+                dh = min(room, w / minAspect).rounded(.down)
+                break
+            }
+            w -= 4
+        }
+        if dh == 0 { dh = (w / minAspect).rounded(.down) }
         let sh = strip.preferredHeight(forWidth: w, backing: backing).rounded()
-        let dh = (w / Self.ddjAspect).rounded(.down)
+        ddj.setDesignWidth(DDJ400View.designH * w / dh)
         let x = ((bounds.width - w) / 2).rounded()
         let y = max(margin, ((bounds.height - sh - dh) / 2).rounded())
         strip.frame = CGRect(x: x, y: y, width: w, height: sh)

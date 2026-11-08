@@ -83,18 +83,23 @@ function makeLayout(G) {
         const origin = deck === 0 ? 0 : G.rightDeckX;
         const x0 = origin + G.deckShift, edge = origin + G.deckW;
         const capY = 36;
-        add(C.loopIn(deck), "round", circle(x0 + 44, 72, 19), "IN/4BEAT", "below", at(x0 + 44, capY, 54), "inside");
-        add(C.loopOut(deck), "round", circle(x0 + 100, 72, 19), "OUT", "below", at(x0 + 100, capY, 54), "inside");
-        add(C.reloop(deck), "round", circle(x0 + 154, 72, 14), "RELOOP/EXIT", "below", at(x0 + 154, capY, 50), "inside");
-        add(C.callLeft(deck), "button", centered(x0 + 212, 72, 26, 24), "◀", "inside", at(x0 + 212, capY, 58));
-        add(C.callRight(deck), "button", centered(x0 + 274, 72, 26, 24), "▶", "inside", at(x0 + 274, capY, 58));
+        // the top row spread over the deck's whole width (b: the place in a 440-wide deck)
+        const tx = (b) => origin + 44 + (b - 44) * (G.deckW - 86) / 354;
+        add(C.loopIn(deck), "round", circle(tx(44), 72, 19), "IN/4BEAT", "below", at(tx(44), capY, 54), "inside");
+        add(C.loopOut(deck), "round", circle(tx(100), 72, 19), "OUT", "below", at(tx(100), capY, 54), "inside");
+        add(C.reloop(deck), "round", circle(tx(154), 72, 14), "RELOOP/EXIT", "below", at(tx(154), capY, 50), "inside");
+        add(C.callLeft(deck), "button", centered(tx(212), 72, 26, 24), "◀", "inside", at(tx(212), capY, 58));
+        add(C.callRight(deck), "button", centered(tx(274), 72, 26, 24), "▶", "inside", at(tx(274), capY, 58));
         add(C.sync(deck), "round", circle(edge - 42, 72, 19), "BEAT SYNC", "below", at(edge - 42, capY, 80), "inside");
         add(C.jog(deck), "jog", circle(x0 + 200, 258, 128), "JOG", "none", "inside", "inside");
         add(C.tempo(deck), "vfader", new Rect(edge - 45, 288, 28, 330), "TEMPO", "below", at(edge - 31, 250, 62));
-        add(C.shift(deck), "shiftButton", centered(x0 + 46, 452, 52, 22), "SHIFT", "inside", above(84));
-        add(C.cue(deck), "round", circle(x0 + 46, 530, 30), "CUE", "inside", above(86));
-        add(C.play(deck), "round", circle(x0 + 46, 626, 30), "▶/II", "inside", above(86));
-        const padX0 = x0 + 97, padW = 66, gap = 8;
+        const cx = origin + 46 + (G.deckW - 440) * 0.1;
+        add(C.shift(deck), "shiftButton", centered(cx, 452, 52, 22), "SHIFT", "inside", above(84));
+        add(C.cue(deck), "round", circle(cx, 530, 30), "CUE", "inside", above(86));
+        add(C.play(deck), "round", circle(cx, 626, 30), "▶/II", "inside", above(86));
+        // square pads filling the room up to the tempo slider
+        const gap = 8, padX0 = cx + 51;
+        const padW = Math.floor((edge - 54 - padX0 - 3 * gap) / 4);
         const modes = [["hotCue", "keyboard"], ["beatLoop", "padFX1"], ["beatJump", "padFX2"], ["sampler", "keyShift"]];
         modes.forEach(([base, alt], i) => {
             const r = new Rect(padX0 + i * (padW + gap), 428, padW, 20);

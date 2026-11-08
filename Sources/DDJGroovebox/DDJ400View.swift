@@ -490,23 +490,26 @@ public struct DeckTrackFace: Equatable {
             let origin: CGFloat = deck == .left ? 0 : rightDeckX
             let x0 = origin + deckShift, edge = origin + deckW   // the controls' block; the deck's outer edge
             let capY: CGFloat = 36
-            // top row: loop section and BEAT SYNC
-            add(.loopIn(deck), .round, circle(x0 + 44, 72, 19), "IN/4BEAT", .below, .at(CGPoint(x: x0 + 44, y: capY), width: 54), value: .inside)
-            add(.loopOut(deck), .round, circle(x0 + 100, 72, 19), "OUT", .below, .at(CGPoint(x: x0 + 100, y: capY), width: 54), value: .inside)
-            add(.reloop(deck), .round, circle(x0 + 154, 72, 14), "RELOOP/EXIT", .below, .at(CGPoint(x: x0 + 154, y: capY), width: 50), value: .inside)
-            add(.callLeft(deck), .button, centered(x0 + 212, 72, 26, 24), "\u{25C0}", .inside, .at(CGPoint(x: x0 + 212, y: capY), width: 58))
-            add(.callRight(deck), .button, centered(x0 + 274, 72, 26, 24), "\u{25B6}", .inside, .at(CGPoint(x: x0 + 274, y: capY), width: 58))
+            // top row: loop section and BEAT SYNC, spread over the deck's whole width (b: the place in a 440-wide deck)
+            func tx(_ b: CGFloat) -> CGFloat { origin + 44 + (b - 44) * (deckW - 86) / 354 }
+            add(.loopIn(deck), .round, circle(tx(44), 72, 19), "IN/4BEAT", .below, .at(CGPoint(x: tx(44), y: capY), width: 54), value: .inside)
+            add(.loopOut(deck), .round, circle(tx(100), 72, 19), "OUT", .below, .at(CGPoint(x: tx(100), y: capY), width: 54), value: .inside)
+            add(.reloop(deck), .round, circle(tx(154), 72, 14), "RELOOP/EXIT", .below, .at(CGPoint(x: tx(154), y: capY), width: 50), value: .inside)
+            add(.callLeft(deck), .button, centered(tx(212), 72, 26, 24), "\u{25C0}", .inside, .at(CGPoint(x: tx(212), y: capY), width: 58))
+            add(.callRight(deck), .button, centered(tx(274), 72, 26, 24), "\u{25B6}", .inside, .at(CGPoint(x: tx(274), y: capY), width: 58))
             add(.sync(deck), .round, circle(edge - 42, 72, 19), "BEAT SYNC", .below, .at(CGPoint(x: edge - 42, y: capY), width: 80), value: .inside)
             // jog and tempo
             add(.jog(deck), .jog, circle(x0 + 200, 258, 128), "JOG", .none, .inside, value: .inside)
             add(.tempo(deck), .vfader, CGRect(x: edge - 45, y: 288, width: 28, height: 330), "TEMPO", .below,
                 .at(CGPoint(x: edge - 31, y: 250), width: 62))
             // transport column
-            add(.shift(deck), .shiftButton, centered(x0 + 46, 452, 52, 22), "SHIFT", .inside, .above(width: 84))
-            add(.cue(deck), .round, circle(x0 + 46, 530, 30), "CUE", .inside, .above(width: 86))
-            add(.play(deck), .round, circle(x0 + 46, 626, 30), "\u{25B6}/II", .inside, .above(width: 86))
-            // mode buttons and pads
-            let padX0 = x0 + 97, padW: CGFloat = 66, gap: CGFloat = 8
+            let cx = origin + 46 + (deckW - 440) * 0.1
+            add(.shift(deck), .shiftButton, centered(cx, 452, 52, 22), "SHIFT", .inside, .above(width: 84))
+            add(.cue(deck), .round, circle(cx, 530, 30), "CUE", .inside, .above(width: 86))
+            add(.play(deck), .round, circle(cx, 626, 30), "\u{25B6}/II", .inside, .above(width: 86))
+            // mode buttons and pads: square pads filling the room up to the tempo slider
+            let gap: CGFloat = 8, padX0 = cx + 51
+            let padW = ((edge - 54 - padX0 - 3 * gap) / 4).rounded(.down)
             let modes: [(PadMode, PadMode)] = [(.hotCue, .keyboard), (.beatLoop, .padFX1), (.beatJump, .padFX2), (.sampler, .keyShift)]
             for (i, m) in modes.enumerated() {
                 let r = CGRect(x: padX0 + CGFloat(i) * (padW + gap), y: 428, width: padW, height: 20)

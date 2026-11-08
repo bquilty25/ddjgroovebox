@@ -89,10 +89,22 @@ final class MIDIManager {
         }
     }
 
-    /// short messages to the DDJ-400 (its LEDs)
+    /// Short messages to the DDJ-400 (its LEDs), one MIDISend each. Seen twice: after large packed bursts (hundreds of
+    /// messages in a few packet lists, as on quit) the controller stopped taking any MIDI until replugged; a test
+    /// sending thousands a second, one per packet, never did.
     func sendToDDJ(_ messages: [MIDIMessage]) {
         guard ddjDestination != 0, !messages.isEmpty else { return }
-        send(messages.map { [$0.status, $0.data1, $0.data2] }, to: ddjDestination)
+        for m in messages { send([[m.status, m.data1, m.data2]], to: ddjDestination) }
+    }
+
+    /// Many messages (every LED off, on quit): in groups of 16, 4 ms apart (blocks the caller ~25 ms per 100)
+    func sendToDDJPaced(_ messages: [MIDIMessage]) {
+        var i = 0
+        while i < messages.count {
+            sendToDDJ(Array(messages[i..<min(messages.count, i + 16)]))
+            i += 16
+            if i < messages.count { usleep(4000) }
+        }
     }
 
     /// the DDJ-400 reports where its faders and knobs are (the request Mixxx sends at start)

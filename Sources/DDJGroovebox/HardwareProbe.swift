@@ -37,7 +37,7 @@ enum HardwareProbe {
         }
         let seconds = Double(ProcessInfo.processInfo.environment["DDJ_PROBE_SECONDS"] ?? "") ?? 2
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) {
-            midi.sendToDDJ(writer.allOff())
+            midi.sendToDDJPaced(writer.allOff())
             lock.lock()
             print("LED messages sent: \(sent) (CoreMIDI took \(midi.sentMessages), last status \(midi.lastSendStatus)) to '\(midi.ddjDestinationName)'")
             print("messages received: \(raw.count), decoded as controls: \(events.count)")

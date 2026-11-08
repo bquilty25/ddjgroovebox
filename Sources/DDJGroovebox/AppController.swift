@@ -223,7 +223,7 @@ final class AppController: NSObject, NSWindowDelegate {
         timer?.invalidate()
         midiOutStopped = true
         instrument.releaseAll()
-        midi.sendToDDJ(ledWriter.allOff())
+        midi.sendToDDJPaced(ledWriter.allOff())                 // (paced: a burst can jam the controller's MIDI input)
         audio.stop()
         if !Self.scripted { instrument.shutdown() }      // (it saves)
     }

@@ -1035,6 +1035,10 @@ void td_pattern_copy(int from, int to)
         E.pat[to] = E.pat[from];
     td_unlock();
 }
+const char *td_pattern_name(int pattern)
+{
+    return E.inited && pattern >= 0 && pattern < TD_PATTERNS ? E.pat[pattern].name : "";
+}
 void td_pattern_clear(int pattern)
 {
     td_lock();

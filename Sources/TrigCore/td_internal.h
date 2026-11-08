@@ -209,6 +209,7 @@ typedef struct {
     uint16_t nscene[2];
     td_scene_ent_t scene[2][TD_SCENE_MAX];
     uint16_t bpm10;                                            /* (added) the pattern's own tempo x 10; 0: keep the current */
+    char name[TD_PATTERN_NAME];                                /* (added) its name ("DEEP"), "" for none; NUL-terminated */
 } td_pattern_t;
 
 /* ---- voices */

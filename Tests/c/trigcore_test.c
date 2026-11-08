@@ -1143,6 +1143,8 @@ TEST(test_default_project)
     int tok = 1;
     for (int p = 0; p < 16; p++) tok &= E.pat[p].bpm10 == tempos[p] * 10;
     check("each pattern has its tempo (house ~124, techno ~130, garage 132-138, drum & bass 165-174)", tok);
+    check("each pattern has its name (P01 DEEP, P07 DUBSPACE, P12 HAZE)", !strcmp(td_pattern_name(0), "DEEP")
+          && !strcmp(td_pattern_name(6), "DUBSPACE") && !strcmp(td_pattern_name(11), "HAZE") && !strcmp(td_pattern_name(16), ""));
     int dnb = 1;                                               /* the two-step: kick on 1 and the "and" of 3, snare 2 and 4 */
     for (int p = 12; p < 16; p++) dnb &= E.pat[p].step[2][4].trig && E.pat[p].step[2][12].trig && E.pat[p].step[0][0].trig;
     check("drum & bass P13..P16: snare on 2 and 4 over a kick on 1, track 3 a snare", dnb && E.pat[13].machine[2] == TD_M_SNARE);

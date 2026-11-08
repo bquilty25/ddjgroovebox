@@ -10,12 +10,13 @@ const TRACKS = 8, NPARAMS = 48, SLOTS = 8, STEPS = 64, LPS = 8, SCENE_MAX = 128;
 const PER_TRACK = 5 + 2 * NPARAMS;
 const LIGHT = 8 + TRACKS * PER_TRACK + SLOTS + 2;           // (td_web.c's SNAP_LIGHT: + the output peaks)
 const STEPS_AT = LIGHT, LOCKS_AT = STEPS_AT + TRACKS * STEPS * 9, SCENES_AT = LOCKS_AT + TRACKS * STEPS * LPS * 2;
+const PATTERNS = 16, NAME = 12, NAMES_AT = SCENES_AT + 2 * (1 + SCENE_MAX * 3);   // (the patterns' names)
 const PROJECT_KEY = "trigdeck.project.v2";
 
 export class TrigWebEngine {
     constructor() {
         this.light = new Int32Array(LIGHT);
-        this.heavy = new Int32Array(SCENES_AT + 2 * (1 + SCENE_MAX * 3));
+        this.heavy = new Int32Array(NAMES_AT + PATTERNS * NAME);
         this.infoCache = new Map();
         this.nextCaptureSlot = 4;
         this.dirty = false;
@@ -134,6 +135,13 @@ export class TrigWebEngine {
     get playing() { return this.light[0] !== 0; }
     get recording() { return this.light[1] !== 0; }
     get pattern() { return this.light[2]; }
+    /** a pattern's name ("DEEP"; "" without one) */
+    patternName(p) {
+        if (!(p >= 0 && p < PATTERNS)) return "";
+        let s = "";
+        for (let k = 0; k < NAME; k++) { const ch = this.heavy[NAMES_AT + p * NAME + k]; if (!ch) break; s += String.fromCharCode(ch); }
+        return s;
+    }
     get queuedPattern() { const q = this.light[3]; return q >= 0 && q !== this.light[2] ? q : null; }
     get bpm() { return this.light[4] / 100; }
     get swing() { return this.light[5]; }

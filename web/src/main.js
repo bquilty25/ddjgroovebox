@@ -103,6 +103,7 @@ function update() {
                      muted: engine.muted(t), level: engine.trackLevel(t), steps, playhead: engine.playingStep(t) };
         }),
         crossfader, autopilot: engine.autopilot, connected: !!midiIn, problem, sceneRows: sceneRows(),
+        patternNames: Array.from({ length: 16 }, (_, p) => engine.patternName(p)),
         scope: readScope(engine, h.page, mapper.track, COLORS.track[mapper.track]),
         // (the picture shows when what the knobs show changes: not a lock playing or an LFO moving)
         scopeKey: `${h.page}:${mapper.track}:${engine.machine(mapper.track)}:` +

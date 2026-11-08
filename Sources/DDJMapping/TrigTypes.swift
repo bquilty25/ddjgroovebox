@@ -77,6 +77,8 @@ public protocol TrigModel: AnyObject {
     var playing: Bool { get }
     var recording: Bool { get }
     var pattern: Int { get }
+    /// a pattern's name ("DEEP"; "" without one)
+    func patternName(_ p: Int) -> String
     var queuedPattern: Int? { get }
     var bpm: Double { get }
     var swing: Int { get }

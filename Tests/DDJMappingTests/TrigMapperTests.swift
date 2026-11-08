@@ -6,6 +6,7 @@ import XCTest
 final class FakeTrig: TrigModel {
     var playing = false, recording = false, pattern = 0
     var queuedPattern: Int?
+    func patternName(_ p: Int) -> String { p == 0 ? "DEEP" : "" }
     var bpm = 120.0, swing = 50
     var autopilot = false
     var machines: [Machine] = [.kick, .snare, .hat, .clap, .synth, .fm, .sample, .tom]
@@ -151,6 +152,24 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.padFunction(.left), .steps, "each deck keeps its own mode")
     }
 
+    func testShiftTapRestoresTempo() {
+        model.bpm = 122
+        XCTAssertEqual(send(.cue(.right), .press(true)), [.tapTempo])
+        model.bpm = 97                                               // (the taps set it)
+        XCTAssertEqual(send(.cue(.right), .press(true)), [.tapTempo])
+        XCTAssertEqual(m.face(.cue(.right))?.title, "TAP · SHIFT: 122")
+        XCTAssertEqual(send(.cue(.right), .press(true), shifted: true), [.tempo(122)], "back to before the taps")
+        XCTAssertEqual(send(.cue(.right), .press(true), shifted: true), [], "nothing more to go back to")
+        XCTAssertEqual(m.face(.cue(.right))?.title, "TAP")
+    }
+
+    func testPatternPadsShowNames() {
+        m.setPadMode(.sampler, deck: .left)
+        XCTAssertEqual(m.face(.pad(.left, 0))?.title, "DEEP")
+        XCTAssertEqual(m.face(.pad(.left, 0))?.value, "P01")
+        XCTAssertEqual(m.face(.pad(.left, 1))?.title, "P02", "no name: the number")
+    }
+
     func testResetToDefault() {
         let p = m.page.rawValue * 8 + 0
         let def = model.info(track: 0, param: p)!.def
@@ -244,6 +263,10 @@ final class TrigMapperTests: XCTestCase {
         send(.headphoneCue(.right), .press(false))
         XCTAssertNil(m.sceneEdit)
         XCTAssertEqual(send(.headphoneCue(.left), .press(true), shifted: true), [.sceneClear(0)])
+        // the scenes start in the middle: the crossfader takes over once it passes the middle
+        XCTAssertEqual(send(.crossfader, .absolute(0.1)), [], "where it sits on connect: ignored")
+        XCTAssertEqual(send(.crossfader, .absolute(0.3)), [])
+        XCTAssertEqual(send(.crossfader, .absolute(0.6)), [.crossfader(0.6)], "passed the middle")
         XCTAssertEqual(send(.crossfader, .absolute(0.25)), [.crossfader(0.25)])
     }
 

@@ -92,7 +92,9 @@ export class StripView {
             level: Math.round((r.level ?? 0) * 10), steps: r.steps?.length ? r.steps : [0], playhead: r.playhead ?? null,
             page: h.stepPage,
         }));
-        const pat = `P${pad2(h.pattern + 1)}` + (h.queued != null ? ` → P${pad2(h.queued + 1)}` : "");
+        const names = input.patternNames ?? [];                  // "P01 DEEP"
+        const named = (p) => `P${pad2(p + 1)}` + (names[p] ? " " + names[p] : "");
+        const pat = named(h.pattern) + (h.queued != null ? " → " + named(h.queued) : "");
         this.center = {
             pattern: pat, bpm: h.bpm.toFixed(0),
             transport: h.recording ? "● REC" : h.playing ? "▶ PLAY" : "■ STOP",
@@ -266,10 +268,10 @@ export class StripView {
             lines.forEach((l, i) => drawTextTop(g, l, r.minX, r.minY + 30 + i * 16, 12, S.fg2));
             return;
         }
-        // every row shown: up to three columns, the rows closer together when even that is not enough
+        // every row shown: up to four columns, the rows closer together when even that is not enough
         const top = r.minY + 22, h = r.maxY - top;
         let rowH = 16, perCol = Math.max(1, Math.floor(h / rowH));
-        const cols = Math.min(3, Math.ceil(rows.length / perCol));
+        const cols = Math.min(4, Math.ceil(rows.length / perCol));
         if (rows.length > perCol * cols) { perCol = Math.ceil(rows.length / cols); rowH = Math.max(9, h / perCol); }
         perCol = Math.max(1, Math.min(perCol, Math.floor(h / rowH)));
         const colW = (r.w - (cols - 1) * 16) / cols;

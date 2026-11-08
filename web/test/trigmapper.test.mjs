@@ -12,6 +12,7 @@ const stepView = (o = {}) => ({ trig: false, note: 60, velocity: 100, cond: 0, r
 class FakeTrig {
     playing = false; recording = false; pattern = 0;
     queuedPattern = null;
+    patternName(p) { return p === 0 ? "DEEP" : ""; }
     bpm = 120; swing = 50;
     autopilot = false;
     machines = [MACHINE.kick, MACHINE.snare, MACHINE.hat, MACHINE.clap, MACHINE.synth, MACHINE.fm, MACHINE.sample,
@@ -165,6 +166,26 @@ test("tracks mode selects and mutes", () => {
     assert.equal(m.padFunction(0), "steps", "each deck keeps its own mode");
 });
 
+test("SHIFT + TAP: the tempo from before the taps", () => {
+    const { m, model, send } = setUp();
+    model.bpm = 122;
+    assert.deepStrictEqual(send(C.cue(1), press(true)), [{ type: "tapTempo" }]);
+    model.bpm = 97;
+    send(C.cue(1), press(true));
+    assert.equal(m.face(C.cue(1)).title, "TAP · SHIFT: 122");
+    assert.deepStrictEqual(send(C.cue(1), press(true), { shifted: true }), [{ type: "tempo", bpm: 122 }]);
+    assert.deepStrictEqual(send(C.cue(1), press(true), { shifted: true }), []);
+    assert.equal(m.face(C.cue(1)).title, "TAP");
+});
+
+test("pattern pads show the names", () => {
+    const { m } = setUp();
+    m.setPadMode("sampler", 0);
+    assert.equal(m.face(C.pad(0, 0)).title, "DEEP");
+    assert.equal(m.face(C.pad(0, 0)).value, "P01");
+    assert.equal(m.face(C.pad(0, 1)).title, "P02");
+});
+
 test("a double-click resets a knob to its default", () => {
     const { m, model, send } = setUp();
     const p = m.page * 8;
@@ -265,6 +286,10 @@ test("scene edit while CUE held, and clear", () => {
     send(C.headphoneCue(1), press(false));
     assert.equal(m.sceneEdit, null);
     assert.deepStrictEqual(send(C.headphoneCue(0), press(true), { shifted: true }), [{ type: "sceneClear", scene: 0 }]);
+    // the scenes start in the middle: the crossfader takes over once it passes the middle
+    assert.deepStrictEqual(send(C.crossfader, absolute(0.1)), [], "where it sits on connect: ignored");
+    assert.deepStrictEqual(send(C.crossfader, absolute(0.3)), []);
+    assert.deepStrictEqual(send(C.crossfader, absolute(0.6)), [{ type: "crossfader", value: 0.6 }], "passed the middle");
     assert.deepStrictEqual(send(C.crossfader, absolute(0.25)), [{ type: "crossfader", value: 0.25 }]);
 });
 

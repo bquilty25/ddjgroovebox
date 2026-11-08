@@ -169,7 +169,11 @@ final class TrigStripView: NSView, TopStrip {
         }
         let h = mapper.header
         var c = CenterInfo()
-        c.pattern = String(format: "P%02d", h.pattern + 1) + (h.queued.map { String(format: " → P%02d", $0 + 1) } ?? "")
+        func named(_ p: Int) -> String {                              // "P01 DEEP"
+            let n = engine.patternName(p)
+            return String(format: "P%02d", p + 1) + (n.isEmpty ? "" : " " + n)
+        }
+        c.pattern = named(h.pattern) + (h.queued.map { " → " + named($0) } ?? "")
         c.bpm = String(format: "%.0f", h.bpm)
         c.transport = h.recording ? "● REC" : h.playing ? "▶ PLAY" : "■ STOP"
         c.page = h.page.name
@@ -277,11 +281,11 @@ final class TrigStripView: NSView, TopStrip {
             for (i, l) in lines.enumerated() { _ = text(l, r.minX, r.minY + 30 + CGFloat(i) * 16, size: 12, SloopStyle.fg2) }
             return
         }
-        // every row shown: up to three columns, the rows closer together when even that is not enough
+        // every row shown: up to four columns, the rows closer together when even that is not enough
         let top = r.minY + 22, h = r.maxY - top
         var rowH: CGFloat = 16
         var perCol = max(1, Int(h / rowH))
-        let cols = min(3, (sceneRows.count + perCol - 1) / perCol)
+        let cols = min(4, (sceneRows.count + perCol - 1) / perCol)
         if sceneRows.count > perCol * cols {
             perCol = (sceneRows.count + cols - 1) / cols
             rowH = max(9, h / CGFloat(perCol))

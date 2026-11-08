@@ -68,6 +68,7 @@ export class TrigMapper {
     #scratchRate = new Map();
     #nudgeLast = null;
     #tempoPicked = false;
+    #crossfaderLast = null;        // (the crossfader passes the middle once before it moves the scenes)
     #swingPicked = false;
     #lastTempoSet = null;
     #lastSwingSet = null;
@@ -85,6 +86,8 @@ export class TrigMapper {
         this.fillHeld = false;
         this.sceneEdit = null;
         this.perfType = PERF_MENU[0];
+        this.tempoBeforeTap = null;     // { bpm, pattern }: the tempo before TAP on this pattern (SHIFT + TAP: back)
+        this.crossfaderPicked = false;  // the crossfader has passed the middle since the start
         this.perfDivision = 2;
         this.perfTarget = 2;
         this.perfAmount = 0.6;
@@ -142,7 +145,16 @@ export class TrigMapper {
         if (kind === "padModeButton" && pressed) { this.#modes[d] = parseControl(c).mode; return []; }
         if (kind === "play" && pressed) return [{ type: e.shifted ? "restart" : "togglePlay" }];
         if (kind === "cue" && d === 0 && pressed) return [{ type: "toggleRecord" }];
-        if (kind === "cue" && d === 1 && pressed) return [{ type: "tapTempo" }];
+        if (kind === "cue" && d === 1 && pressed) {
+            // TAP; SHIFT + TAP: the tempo from before the taps comes back (kept until then, or another pattern)
+            const b = this.tempoBeforeTap;
+            if (e.shifted) {
+                this.tempoBeforeTap = null;
+                return b && b.pattern === this.model.pattern ? [{ type: "tempo", bpm: b.bpm }] : [];
+            }
+            if (!b || b.pattern !== this.model.pattern) this.tempoBeforeTap = { bpm: this.model.bpm, pattern: this.model.pattern };
+            return [{ type: "tapTempo" }];
+        }
         if (kind === "sync" && d === 0 && pressed && e.shifted) {            // SHIFT + FILL
             return [{ type: "autopilot", on: !model.autopilot }];
         }
@@ -238,7 +250,16 @@ export class TrigMapper {
             if (kind === "fxLevel") { this.perfAmount = x; return this.perfOn ? [this.#perfAction(true)] : []; }
             if (kind === "trim") return [{ type: "deckDrive", deck: d, drive: x }];
             if (kind === "channelFader") return [{ type: "deckLevel", deck: d, level: x }];
-            if (kind === "crossfader") return [{ type: "crossfader", value: x }];
+            if (kind === "crossfader") {
+                // the app starts in the middle (the pattern as written): it takes over once it passes the middle
+                if (!this.crossfaderPicked) {
+                    const crossed = this.#crossfaderLast !== null && (this.#crossfaderLast - 0.5) * (x - 0.5) <= 0;
+                    this.#crossfaderLast = x;
+                    if (!(Math.abs(x - 0.5) <= 0.06 || crossed)) return [];
+                    this.crossfaderPicked = true;
+                }
+                return [{ type: "crossfader", value: x }];
+            }
             if (kind === "tempo" && d === 0) return this.#tempo(x);
             if (kind === "tempo" && d === 1) return this.#swing(x);
         }
@@ -652,7 +673,10 @@ export class TrigMapper {
             return face(model.playing ? "STOP" : "PLAY", { color: 0xFF1ECC70, light: model.playing ? ON : OFF });
         case "cue":
             if (d === 0) return face("REC", { color: 0xFFFF2C34, light: model.recording ? ON : OFF });
-            return face("TAP", { value: String(roundSwift(model.bpm)) });
+        {   // (SHIFT + TAP: back to the tempo before the taps; shown while there is one to go back to)
+            const b = this.tempoBeforeTap, back = b && b.pattern === model.pattern ? b.bpm : null;
+            return face(back !== null ? `TAP · SHIFT: ${roundSwift(back)}` : "TAP", { value: String(roundSwift(model.bpm)) });
+        }
         case "sync":
             if (d === 0) {
                 return face("FILL", { value: model.autopilot ? "AUTOPILOT" : null,
@@ -718,7 +742,7 @@ export class TrigMapper {
         }
         case "trim": return face(d === 0 ? "DRIVE A" : "DRIVE B");
         case "channelFader": return face(d === 0 ? "DECK A" : "DECK B");
-        case "crossfader": return face("SCENE A ◀ AS WRITTEN ▶ SCENE B");
+        case "crossfader": return face("SCENE A ◀ AS WRITTEN ▶ SCENE B", { value: this.crossfaderPicked ? null : "MOVE THROUGH THE MIDDLE" });
         case "tempo":
             if (d === 0) return face("TEMPO", { value: format0(model.bpm) });
             return face("SWING", { value: `${model.swing}%` });
@@ -820,8 +844,9 @@ export class TrigMapper {
         }
         case "patterns": {
             const p = (d === 0 ? 0 : 8) + i;
-            return face(`P${String(p + 1).padStart(2, "0")}`, { light: p === model.pattern ? ON : OFF,
-                                                               outlined: p === (model.queuedPattern ?? null) });
+            const number = `P${String(p + 1).padStart(2, "0")}`, name = model.patternName?.(p) ?? "";   // (its name, its number under)
+            return face(name || number, { value: name ? number : null, light: p === model.pattern ? ON : OFF,
+                                          outlined: p === (model.queuedPattern ?? null) });
         }
         }
         return face("");

@@ -1259,15 +1259,16 @@ static void build(int p, void (*fill)(void))
 void td_default_project(void)
 {
     /* four of each, each at its tempo: house (left deck pads 1-4), techno (5-8), garage (right 1-4), drum & bass (5-8) */
-    static const struct { void (*fill)(void); int bpm; } SET[TD_PATTERNS] = {
-        {v_deep, 122}, {v_tech, 126}, {v_jackin, 124}, {v_afro, 122},
-        {v_techno, 130}, {pat_micro, 124}, {pat_dubspace, 118}, {v_melodic, 124},
-        {v_2step, 132}, {v_speed, 132}, {v_4x4, 132}, {pat_haze, 130},
-        {v_liquid, 174}, {v_neuro, 174}, {v_jungle, 165}, {v_roller, 172},
+    static const struct { void (*fill)(void); int bpm; const char *name; } SET[TD_PATTERNS] = {
+        {v_deep, 122, "DEEP"}, {v_tech, 126, "TECH"}, {v_jackin, 124, "JACKIN"}, {v_afro, 122, "AFRO"},
+        {v_techno, 130, "TECHNO"}, {pat_micro, 124, "MICRO"}, {pat_dubspace, 118, "DUBSPACE"}, {v_melodic, 124, "MELODIC"},
+        {v_2step, 132, "2-STEP"}, {v_speed, 132, "SPEED"}, {v_4x4, 132, "4X4"}, {pat_haze, 130, "HAZE"},
+        {v_liquid, 174, "LIQUID"}, {v_neuro, 174, "NEURO"}, {v_jungle, 165, "JUNGLE"}, {v_roller, 172, "ROLLER"},
     };
     for (int p = 0; p < TD_PATTERNS; p++) {
         build(p, SET[p].fill);
         E.pat[p].bpm10 = (uint16_t)(SET[p].bpm * 10);
+        strncpy(E.pat[p].name, SET[p].name, TD_PATTERN_NAME - 1);   /* (td_pattern_init_kit cleared the rest) */
     }
 
     E.bpm = 122.f;

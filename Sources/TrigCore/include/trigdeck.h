@@ -19,6 +19,7 @@ extern "C" {
 #define TD_DECKS 2                 /* deck A: tracks 0-3, deck B: tracks 4-7 */
 #define TD_STEPS 64
 #define TD_PATTERNS 16
+#define TD_PATTERN_NAME 12             /* a pattern's name: up to 11 characters */
 #define TD_SLOTS 8                 /* parameters per page: knobs A..H */
 #define TD_SAMPLE_SLOTS 16
 
@@ -156,6 +157,7 @@ int td_step_lock_get(int track, int step, int param, int *value);   /* 1 if lock
 /* ---- patterns */
 void td_pattern_queue(int pattern);                      /* switches at the end of the current pattern (at once when stopped) */
 void td_pattern_copy(int from, int to);
+const char *td_pattern_name(int pattern);                /* "DEEP"; "" without one (copied with the pattern, saved) */
 void td_pattern_clear(int pattern);
 
 /* ---- scenes and the crossfader */

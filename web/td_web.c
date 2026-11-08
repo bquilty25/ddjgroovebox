@@ -38,9 +38,11 @@ EXPORT(tdw_muted) int tdw_muted(int t) { return t >= 0 && t < TD_TRACKS ? g_st.m
  *                          master[8]
  * heavy part (full = 1):   per track and step: trig, note, velocity, cond, retrig, micro, locks, slide, accent;
  *                          per track and step, 8 locks: param, value (param -1: none);
- *                          per scene: count, then 128 x (track, param, value) */
+ *                          per scene: count, then 128 x (track, param, value);
+ *                          the 16 patterns' names, 12 characters each */
 #define SNAP_LIGHT (8 + TD_TRACKS * (5 + 2 * TD_NPARAMS) + TD_SLOTS + 2)   /* (+ the output peaks, x 1e6) */
-#define SNAP_FULL (SNAP_LIGHT + TD_TRACKS * TD_STEPS * 9 + TD_TRACKS * TD_STEPS * TD_LPS * 2 + 2 * (1 + TD_SCENE_MAX * 3))
+#define SNAP_FULL (SNAP_LIGHT + TD_TRACKS * TD_STEPS * 9 + TD_TRACKS * TD_STEPS * TD_LPS * 2 + 2 * (1 + TD_SCENE_MAX * 3) \
+                   + TD_PATTERNS * TD_PATTERN_NAME)
 static int32_t g_snap[SNAP_FULL];
 
 static uint32_t pattern_hash(const td_pattern_t *P)        /* FNV-1a over the steps, locks, scenes and lengths */
@@ -51,6 +53,8 @@ static uint32_t pattern_hash(const td_pattern_t *P)        /* FNV-1a over the st
     for (int k = 0; k < 4; k++)
         for (size_t i = 0; i < sizes[k]; i++) h = (h ^ parts[k][i]) * 16777619u;
     h = (h ^ P->nscene[0]) * 16777619u;
+    for (int p = 0; p < TD_PATTERNS; p++)                      /* (the names: a copy or a load renames another) */
+        for (int k = 0; k < TD_PATTERN_NAME; k++) h = (h ^ (uint8_t)E.pat[p].name[k]) * 16777619u;
     return (h ^ P->nscene[1]) * 16777619u;
 }
 
@@ -95,6 +99,8 @@ EXPORT(tdw_snapshot) int32_t *tdw_snapshot(int full)
                 *o++ = on ? P->scene[sc][k].value : 0;
             }
         }
+        for (int p = 0; p < TD_PATTERNS; p++)
+            for (int k = 0; k < TD_PATTERN_NAME; k++) *o++ = (uint8_t)E.pat[p].name[k];
     }
     return g_snap;
 }

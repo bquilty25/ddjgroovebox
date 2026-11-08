@@ -42,6 +42,8 @@ public final class TrigMapper {
     private var heldTrackPads: [DDJControl: Int] = [:]  // TRACKS mode: a track's pad held -> the track
     private var muteHolds: [DDJControl: (at: Double, before: [Bool])] = [:]   // a mute pad held: when, the mutes before
     private var soloSaved: [Bool]?                         // the mutes before a solo (restored when it ends)
+    /// the tempo before TAP was first pressed on this pattern (SHIFT + TAP puts it back)
+    public private(set) var tempoBeforeTap: (bpm: Double, pattern: Int)?
     /// a mute or solo pad held at least this long (seconds) is temporary: letting go puts the tracks back
     public static let holdToRestore = 0.4
     private var pressedPads: Set<DDJControl> = []
@@ -57,6 +59,9 @@ public final class TrigMapper {
     private var scratchRate: [Deck: Double] = [:]
     private var nudgeLast: Double?
     private var tempoPicked = false, swingPicked = false
+    /// the crossfader has passed the middle since the start (until then it leaves the scenes in the middle)
+    public private(set) var crossfaderPicked = false
+    private var crossfaderLast: Double?
     private var lastTempoSet: Double?, lastSwingSet: Int?
 
     public static let ticksPerSecondAtSpeed = 400.0     // 720 ticks a turn at 33 1/3 rpm (Mixxx's DDJ-400 setting)
@@ -88,7 +93,15 @@ public final class TrigMapper {
         case (.padModeButton(let d, let m), .press(true)): modes[d] = m; return []
         case (.play, .press(true)): return [e.shifted ? .restart : .togglePlay]
         case (.cue(.left), .press(true)): return [.toggleRecord]
-        case (.cue(.right), .press(true)): return [.tapTempo]
+        case (.cue(.right), .press(true)):
+            // TAP; SHIFT + TAP: the tempo from before the taps comes back (kept until then, or another pattern)
+            if e.shifted {
+                guard let b = tempoBeforeTap, b.pattern == model.pattern else { tempoBeforeTap = nil; return [] }
+                tempoBeforeTap = nil
+                return [.tempo(b.bpm)]
+            }
+            if tempoBeforeTap?.pattern != model.pattern { tempoBeforeTap = (model.bpm, model.pattern) }
+            return [.tapTempo]
         case (.sync(.left), .press(true)) where e.shifted: return [.autopilot(!model.autopilot)]   // SHIFT + FILL
         case (.sync(.left), .press(let down)):
             if !down && !fillHeld { return [] }
@@ -155,7 +168,15 @@ public final class TrigMapper {
         case (.fxLevel, .absolute(let v)): perfAmount = v; return perfOn ? [perfAction(on: true)] : []
         case (.trim(let d), .absolute(let v)): return [.deckDrive(deck: d.rawValue, drive: v)]
         case (.channelFader(let d), .absolute(let v)): return [.deckLevel(deck: d.rawValue, level: v)]
-        case (.crossfader, .absolute(let v)): return [.crossfader(v)]
+        case (.crossfader, .absolute(let v)):
+            // the app starts in the middle (the pattern as written): the crossfader takes over once it passes the middle
+            if !crossfaderPicked {
+                let crossed = crossfaderLast.map { ($0 - 0.5) * (v - 0.5) <= 0 } ?? false
+                crossfaderLast = v
+                guard abs(v - 0.5) <= 0.06 || crossed else { return [] }
+                crossfaderPicked = true
+            }
+            return [.crossfader(v)]
         case (.tempo(.left), .absolute(let v)): return tempo(v)
         case (.tempo(.right), .absolute(let v)): return swing(v)
         case (.jogTouch(let d), .press(true)) where e.shifted:
@@ -528,7 +549,10 @@ public final class TrigMapper {
         case .play: return ControlFace(title: model.playing ? "STOP" : "PLAY", color: 0xFF1ECC70,
                                        light: model.playing ? .on : .off)
         case .cue(.left): return ControlFace(title: "REC", color: 0xFFFF2C34, light: model.recording ? .on : .off)
-        case .cue(.right): return ControlFace(title: "TAP", value: "\(Int(model.bpm.rounded()))")
+        case .cue(.right):
+            // (SHIFT + TAP: back to the tempo before the taps; shown while there is one to go back to)
+            let back = tempoBeforeTap.flatMap { $0.pattern == model.pattern ? $0.bpm : nil }
+            return ControlFace(title: back.map { "TAP · SHIFT: \(Int($0.rounded()))" } ?? "TAP", value: "\(Int(model.bpm.rounded()))")
         case .sync(.left): return ControlFace(title: "FILL", value: model.autopilot ? "AUTOPILOT" : nil,
                                               light: fillHeld || model.autopilot ? .on : .off)
         case .sync(.right): return ControlFace(title: "MASTER", color: TrigColors.page[6], light: page == .master ? .on : .off)
@@ -578,7 +602,8 @@ public final class TrigMapper {
             return ControlFace(title: ["DECK A", "DECK B", "MASTER"][min(2, max(0, n))], light: perfTarget == n ? .on : .off)
         case .trim(let d): return ControlFace(title: d == .left ? "DRIVE A" : "DRIVE B")
         case .channelFader(let d): return ControlFace(title: d == .left ? "DECK A" : "DECK B")
-        case .crossfader: return ControlFace(title: "SCENE A ◀ AS WRITTEN ▶ SCENE B")
+        case .crossfader:
+            return ControlFace(title: "SCENE A ◀ AS WRITTEN ▶ SCENE B", value: crossfaderPicked ? nil : "MOVE THROUGH THE MIDDLE")
         case .tempo(.left): return ControlFace(title: "TEMPO", value: String(format: "%.0f", model.bpm))
         case .tempo(.right): return ControlFace(title: "SWING", value: "\(model.swing)%")
         case .jog(let d), .jogTouch(let d):
@@ -670,8 +695,9 @@ public final class TrigMapper {
                                light: muted ? .off : (solo ? .on : .dim))
         case .patterns:
             let p = (d == .left ? 0 : 8) + i
-            return ControlFace(title: String(format: "P%02d", p + 1), light: p == model.pattern ? .on : .off,
-                               outlined: p == model.queuedPattern)
+            let number = String(format: "P%02d", p + 1), name = model.patternName(p)   // (its name, its number under)
+            return ControlFace(title: name.isEmpty ? number : name, value: name.isEmpty ? nil : number,
+                               light: p == model.pattern ? .on : .off, outlined: p == model.queuedPattern)
         }
     }
 

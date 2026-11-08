@@ -13,7 +13,7 @@
  * magic or version, a wrong length, a bad CRC or anything that does not parse is refused and nothing changes. */
 #include "td_internal.h"
 
-#define TD_PROJ_VERSION 2                                     /* (2: each pattern's tempo; 1 still loads) */
+#define TD_PROJ_VERSION 3                                     /* (2: each pattern's tempo; 3: its name; 1, 2 still load) */
 #define HDR 16
 
 uint32_t td_crc32(const void *data, size_t n)
@@ -36,7 +36,7 @@ uint32_t td_crc32(const void *data, size_t n)
 
 size_t td_project_size(void)
 {
-    size_t per = 16 + 2 + TD_TRACKS * TD_NPARAMS * 2 + (size_t)TD_TRACKS * TD_STEPS * (9 + TD_LPS * 3) + 2 * (2 + TD_SCENE_MAX * 4);
+    size_t per = 16 + 2 + TD_PATTERN_NAME + TD_TRACKS * TD_NPARAMS * 2 + (size_t)TD_TRACKS * TD_STEPS * (9 + TD_LPS * 3) + 2 * (2 + TD_SCENE_MAX * 4);
     return HDR + 8 + TD_SLOTS * 2 + TD_PATTERNS * per;
 }
 
@@ -70,6 +70,7 @@ int td_project_save(void *buf, size_t n)
         for (int t = 0; t < TD_TRACKS; t++) w8(&w, P->machine[t]);
         for (int t = 0; t < TD_TRACKS; t++) w8(&w, P->length[t]);
         w16(&w, P->bpm10);
+        for (int k = 0; k < TD_PATTERN_NAME; k++) w8(&w, k < TD_PATTERN_NAME - 1 ? (uint8_t)P->name[k] : 0);
         for (int t = 0; t < TD_TRACKS; t++)
             for (int q = 0; q < TD_NPARAMS; q++) w16(&w, P->param[t][q]);
         for (int t = 0; t < TD_TRACKS; t++)
@@ -138,6 +139,14 @@ int td_project_load(const void *buf, size_t n)
         if (version >= 2) {                                    /* (v2: the pattern's own tempo; 0 = none) */
             int b = (uint16_t)r16(&r);
             P->bpm10 = (uint16_t)(b ? clampi(b, 300, 3000) : 0);
+        }
+        if (version >= 3) {                                    /* (v3: its name; printable ASCII only) */
+            for (int k = 0; k < TD_PATTERN_NAME; k++) {
+                int ch = r8(&r);
+                P->name[k] = (char)(ch >= 32 && ch < 127 && k < TD_PATTERN_NAME - 1 ? ch : 0);
+            }
+            P->name[TD_PATTERN_NAME - 1] = 0;
+            for (int k = 0; k < TD_PATTERN_NAME; k++) if (!P->name[k]) { memset(P->name + k, 0, (size_t)(TD_PATTERN_NAME - k)); break; }
         }
         for (int t = 0; t < TD_TRACKS; t++)
             for (int q = 0; q < TD_NPARAMS; q++) {

@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:ddjgroovebox}",
+            "name": "Debug DDJGroovebox",
+            "target": "DDJGroovebox",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug DDJGroovebox"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:ddjgroovebox}",
+            "name": "Release DDJGroovebox",
+            "target": "DDJGroovebox",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release DDJGroovebox"
+        }
+    ]
+}

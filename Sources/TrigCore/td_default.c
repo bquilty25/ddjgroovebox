@@ -940,9 +940,121 @@ static void pat_roller(void)
     trig(6, 6, 60, 80); trig(6, 13, 64, 70);
     prm(5, SRC(SY_SHAPE), 96); prm(5, SRC(SY_CHORD), 1); prm(5, P_CUT, 64); prm(5, P_ADEC, 20); prm(5, P_ASUS, 0);
     prm(5, P_DLY, 80); prm(5, P_LEVEL, 76);
+    P->length[5] = 32;                                         /* (its stab is in the second bar) */
     trig(5, 18, 57, 90)->cond = TD_COND_AB + 1;
     scene(0, 4, P_CUT, 30); scene(0, 0, P_LOWCUT, 60);
     scene(1, 4, P_ODRV, 80); scene(1, 5, P_DLY, 110);
+}
+
+/* ---- voices: each pattern's melodic tracks get a sound of their own (the patterns first shared a few: saw stabs into
+ * the delay, one organ, one pad, one electric piano). A voice sets only the timbre: the source's wave, the filter, the
+ * envelope and a few effects; the notes, chords (SY_CHORD), glide, level, duck and length stay the pattern's. */
+static void tone(int t, int shape, int detune, int sub, int noise)
+{
+    prm(t, SRC(SY_SHAPE), shape); prm(t, SRC(SY_DETUNE), detune); prm(t, SRC(SY_SUB), sub); prm(t, SRC(SY_NOISE), noise);
+}
+static void filt(int t, int type, int cut, int res, int env, int dec, int drive)   /* type 0 LP, 1 BP, 2 HP */
+{
+    prm(t, P_FTYPE, type); prm(t, P_CUT, cut); prm(t, P_RES, res); prm(t, P_FENV, env); prm(t, P_FDEC, dec); prm(t, P_FDRV, drive);
+}
+static void amp(int t, int atk, int dec, int sus, int rel)
+{
+    prm(t, P_AATK, atk); prm(t, P_ADEC, dec); prm(t, P_ASUS, sus); prm(t, P_AREL, rel);
+}
+static void fm_voice(int t, int ratio, int index, int fb, int envdec, int envamt)
+{
+    if (P->machine[t] != TD_M_FM) {                            /* (keeps the chord when there is one) */
+        int chord = P->param[t][P_SRC + SY_CHORD];
+        td_set_machine_x(P, t, TD_M_FM);
+        prm(t, SRC(FM_CHORD), chord);
+    }
+    prm(t, SRC(FM_RATIO), ratio); prm(t, SRC(FM_INDEX), index); prm(t, SRC(FM_FDBK), fb);
+    prm(t, SRC(FM_ENVDEC), envdec); prm(t, SRC(FM_ENVAMT), envamt);
+}
+
+/* the patterns with their voices (used for the default patterns and for their sound packs alike) */
+static void v_deep(void)
+{
+    pat_house();
+    tone(4, 42, 0, 70, 0); filt(4, 0, 40, 22, 40, 20, 20); amp(4, 0, 44, 30, 12);          /* a round, woody pluck bass */
+    tone(5, 60, 26, 0, 6); filt(5, 0, 64, 52, 22, 24, 10); amp(5, 0, 30, 0, 22);            /* a smoky, resonant chord */
+    prm(5, P_CHO, 70); prm(5, P_LEVEL, 110);
+}
+static void v_tech(void)
+{
+    pat_tech();
+    tone(4, 112, 4, 60, 0); filt(4, 1, 68, 36, 30, 18, 40); amp(4, 0, 26, 20, 8);           /* a rubbery band-pass bass */
+    prm(4, P_LEVEL, 127);
+    fm_voice(5, 9, 64, 10, 12, 100); amp(5, 0, 16, 0, 10);                                  /* an FM blip */
+}
+static void v_jackin(void)
+{
+    pat_jackin();
+    tone(4, 85, 0, 30, 0); filt(4, 0, 62, 20, 22, 26, 10); amp(4, 0, 36, 20, 10);           /* a plain saw bass */
+    prm(5, SRC(FM_INDEX), 40); prm(5, P_LSPD, 40); prm(5, P_LWAVE, 0); prm(5, P_LDEST, 22); prm(5, P_LDEPTH, 30);   /* EP, auto-pan */
+}
+static void v_afro(void)
+{
+    pat_afro();
+    tone(7, 40, 20, 30, 0); filt(7, 0, 58, 10, 0, 40, 0); amp(7, 50, 0, 100, 70);          /* a warm triangle pad */
+}
+static void v_techno(void)
+{
+    pat_techno();
+    tone(5, 127, 10, 0, 0); filt(5, 2, 30, 40, 30, 16, 10); amp(5, 0, 20, 0, 18);          /* a hollow high-passed square */
+    prm(5, P_LEVEL, 112);
+}
+static void v_acid(void)
+{
+    pat_acid();
+    tone(5, 70, 30, 0, 30); filt(5, 2, 60, 20, 0, 20, 0); amp(5, 0, 40, 0, 40);            /* a noisy, thin hit */
+    prm(5, P_REV, 90);
+}
+static void v_dub(void) { pat_dubdeep(); }                    /* (the classic: a filtered minor 9 stab, a sine sub) */
+static void v_melodic(void)
+{
+    pat_melodic();
+    tone(4, 85, 12, 60, 0); filt(4, 0, 36, 10, 16, 30, 10); amp(4, 0, 50, 40, 12);         /* a dark warm saw sub */
+    tone(5, 42, 0, 0, 0); filt(5, 0, 80, 20, 30, 14, 0); amp(5, 0, 16, 0, 16);              /* a glassy triangle pluck */
+    tone(6, 88, 62, 0, 0); filt(6, 0, 54, 10, 0, 40, 0); amp(6, 70, 0, 100, 80);            /* a saw string pad */
+    prm(6, P_CHO, 80);
+}
+static void v_2step(void)
+{
+    pat_garage();
+    tone(4, 0, 0, 0, 0); amp(4, 0, 60, 60, 20); prm(4, P_ODRV, 70);                         /* a driven sine sub */
+}
+static void v_speed(void)
+{
+    pat_speed();
+    fm_voice(5, 1, 30, 6, 22, 80); amp(5, 0, 40, 10, 30);                                  /* a piano-like FM stab */
+}
+static void v_4x4(void) { pat_4x4(); }                        /* (the organ bass, the electric piano) */
+static void v_bassline(void)
+{
+    pat_bassline();
+    tone(5, 92, 30, 0, 0); filt(5, 0, 50, 30, 50, 22, 20); amp(5, 4, 30, 30, 14);          /* a brassy saw stab */
+}
+static void v_liquid(void)
+{
+    pat_liquid();
+    prm(5, SRC(FM_RATIO), 5); prm(5, SRC(FM_INDEX), 22); prm(5, SRC(FM_ENVDEC), 40);       /* a glassy bell piano */
+    tone(6, 50, 30, 0, 20); filt(6, 2, 40, 10, 0, 40, 0); amp(6, 80, 0, 100, 90);           /* an airy high-passed pad */
+    prm(6, P_REV, 110);
+}
+static void v_neuro(void) { pat_neuro(); }                    /* (the reese, the metallic FM) */
+static void v_jungle(void)
+{
+    pat_jungle();
+    tone(6, 80, 40, 50, 0); filt(6, 0, 50, 20, 0, 40, 0); amp(6, 60, 0, 100, 70);           /* a dark pad */
+    prm(6, P_LEVEL, 92);
+}
+static void v_roller(void)
+{
+    pat_roller();
+    fm_voice(4, 1, 40, 20, 14, 70); amp(4, 0, 30, 20, 10); prm(4, P_CUT, 90);              /* a punchy FM bass */
+    tone(5, 70, 16, 0, 0); filt(5, 0, 62, 10, 10, 30, 0); amp(5, 0, 24, 0, 20);             /* a lo-fi chord */
+    prm(5, P_BITS, 70); prm(5, P_SRR, 50);
 }
 
 /* P05: electro. Broken kicks, a snare on 2 and 4, sixteenth hats, a square bass, an FM zap */
@@ -1018,10 +1130,10 @@ void td_default_project(void)
 {
     /* four of each, each at its tempo: house (left deck pads 1-4), techno (5-8), garage (right 1-4), drum & bass (5-8) */
     static const struct { void (*fill)(void); int bpm; } SET[TD_PATTERNS] = {
-        {pat_house, 122}, {pat_tech, 126}, {pat_jackin, 124}, {pat_afro, 122},
-        {pat_techno, 130}, {pat_acid, 132}, {pat_dubdeep, 122}, {pat_melodic, 124},
-        {pat_garage, 132}, {pat_speed, 132}, {pat_4x4, 132}, {pat_bassline, 138},
-        {pat_liquid, 174}, {pat_neuro, 174}, {pat_jungle, 165}, {pat_roller, 172},
+        {v_deep, 122}, {v_tech, 126}, {v_jackin, 124}, {v_afro, 122},
+        {v_techno, 130}, {v_acid, 132}, {v_dub, 122}, {v_melodic, 124},
+        {v_2step, 132}, {v_speed, 132}, {v_4x4, 132}, {v_bassline, 138},
+        {v_liquid, 174}, {v_neuro, 174}, {v_jungle, 165}, {v_roller, 172},
     };
     for (int p = 0; p < TD_PATTERNS; p++) {
         build(p, SET[p].fill);
@@ -1152,10 +1264,10 @@ static void kit_keys(void)
 
 static const struct { const char *name; void (*fill)(void); } PACKS[] = {
     {"808", kit_808}, {"909", kit_909}, {"KEYS", kit_keys},
-    {"DEEP", pat_house}, {"TECH", pat_tech}, {"JACKIN", pat_jackin}, {"AFRO", pat_afro},
-    {"TECHNO", pat_techno}, {"ACID", pat_acid}, {"DUB", pat_dubdeep}, {"MELODIC", pat_melodic},
-    {"2-STEP", pat_garage}, {"SPEED", pat_speed}, {"4X4", pat_4x4}, {"BASSLINE", pat_bassline},
-    {"LIQUID", pat_liquid}, {"NEURO", pat_neuro}, {"JUNGLE", pat_jungle}, {"ROLLER", pat_roller},
+    {"DEEP", v_deep}, {"TECH", v_tech}, {"JACKIN", v_jackin}, {"AFRO", v_afro},
+    {"TECHNO", v_techno}, {"ACID", v_acid}, {"DUB", v_dub}, {"MELODIC", v_melodic},
+    {"2-STEP", v_2step}, {"SPEED", v_speed}, {"4X4", v_4x4}, {"BASSLINE", v_bassline},
+    {"LIQUID", v_liquid}, {"NEURO", v_neuro}, {"JUNGLE", v_jungle}, {"ROLLER", v_roller},
     {"MINIMAL", pat_minimal}, {"FILTER", pat_filter}, {"HARD", pat_hard}, {"PROG", pat_prog},
     {"DISCO", pat_disco}, {"BREAKS", pat_breaks}, {"ELECTRO", pat_electro}, {"POLYDUB", pat_dub},
 };

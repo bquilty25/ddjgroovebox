@@ -123,8 +123,9 @@ final class TrigStripView: NSView, TopStrip {
     private var center = CenterInfo()
     struct TrackRow: Equatable {
         var name: String, color: UInt32, active: Bool, muted: Bool, level: Int
-        var steps: [UInt8]                               // 0 off, 1 trig, 2 lock only, 3 trig + locks
+        var steps: [UInt8]                               // the whole track: 0 off, 1 trig, 2 lock only, 3 trig + locks
         var playhead: Int?
+        var page: Int                                    // the 16 steps the pads show (framed)
     }
     struct CenterInfo: Equatable {
         var pattern = "P01", bpm = "120", transport = "■", page = "SRC", pageColor: UInt32 = 0xFFFFFFFF
@@ -151,17 +152,14 @@ final class TrigStripView: NSView, TopStrip {
         let page = mapper.stepPage
         let new: [TrackRow] = (0..<8).map { t in
             let level = meters || t >= rows.count ? Int((engine.trackLevel(t) * 10).rounded()) : rows[t].level
-            let len = engine.length(t)
-            let steps: [UInt8] = (0..<16).map { i in
-                let s = page * 16 + i
-                guard s < len else { return 255 }
+            let len = max(1, engine.length(t))
+            let steps: [UInt8] = (0..<len).map { s in
                 let v = engine.step(track: t, step: s)
                 return v.trig ? (v.locks > 0 ? 3 : 1) : (v.locks > 0 ? 2 : 0)
             }
-            let ph = engine.playingStep(t).flatMap { $0 / 16 == page ? $0 % 16 : nil }
             return TrackRow(name: engine.machineName(engine.machine(t).rawValue), color: TrigColors.track[t],
                             active: t == mapper.track, muted: engine.muted(t),
-                            level: level, steps: steps, playhead: ph)
+                            level: level, steps: steps, playhead: engine.playingStep(t), page: page)
         }
         let h = mapper.header
         var c = CenterInfo()
@@ -199,6 +197,13 @@ final class TrigStripView: NSView, TopStrip {
         packLoaded = mapper.packLoaded
         packReverted = mapper.packReverted
         clockOffset = mapper.now() - CACurrentMediaTime()
+        // the step page: a change shows the page map for a moment
+        let sp = (mapper.stepPage, mapper.pageCount, mapper.track)
+        if sp != stepPageSeen {
+            if stepPageSeen.1 > 1 || sp.1 > 1, sp.0 != stepPageSeen.0 || sp.2 != stepPageSeen.2 { pageChanged = now }
+            stepPageSeen = sp
+        }
+        if now - pageChanged < Self.pageMapShown + 0.4 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         let browsing = mapper.packBrowsed
         if browsing != packBrowsed { packBrowsed = browsing; setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         if mapper.now() - packBrowsed < Self.scopeShown + 0.5 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
@@ -223,6 +228,40 @@ final class TrigStripView: NSView, TopStrip {
     private var packLoaded: (index: Int, at: Double)?
     private var packReverted: Double?
     private var clockOffset = 0.0                                // mapper clock - CACurrentMediaTime
+    private var stepPageSeen = (0, 1, 0)                         // (page, pages, track)
+    private var pageChanged = -100.0
+    static let pageMapShown = 2.5
+
+    /// The active track's step pages as blocks, the one on the pads lit, the playhead running through them.
+    private func drawPageMap(_ g: CGContext, _ r: CGRect) {
+        let (page, pages, t) = stepPageSeen
+        guard t < rows.count, pages > 0 else { return }
+        let row = rows[t], c = NSColor(argb: row.color)
+        let title = NSAttributedString(string: "STEPS \(page * 16 + 1)-\(min(row.steps.count, page * 16 + 16))  ·  PAGE \(page + 1)/\(pages)",
+                                       attributes: [.font: SloopStyle.font(13), .foregroundColor: SloopStyle.fg])
+        title.draw(at: CGPoint(x: r.midX - title.size().width / 2, y: r.minY))
+        let gap: CGFloat = 10, top = r.minY + 22
+        let bw = min(130, (r.width - gap * CGFloat(pages - 1)) / CGFloat(pages)), bh = max(16, r.height - 30)
+        let x0 = r.midX - (bw * CGFloat(pages) + gap * CGFloat(pages - 1)) / 2
+        for p in 0..<pages {
+            let box = CGRect(x: x0 + CGFloat(p) * (bw + gap), y: top, width: bw, height: bh)
+            let on = p == page
+            g.setFillColor((on ? c.withAlphaComponent(0.18) : SloopStyle.s2).cgColor); g.fill(box)
+            let cw = box.width / 16
+            for i in 0..<16 {                                     // the page's steps
+                let s = p * 16 + i
+                guard s < row.steps.count else { break }
+                let v = row.steps[s]
+                g.setFillColor((v == 1 || v == 3 ? c.withAlphaComponent(on ? 1 : 0.5) : SloopStyle.s3).cgColor)
+                g.fill(CGRect(x: box.minX + CGFloat(i) * cw + 1, y: box.midY - 4, width: cw - 2, height: 8))
+                if row.playhead == s { g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: box.minX + CGFloat(i) * cw, y: box.minY + 3, width: cw, height: box.height - 6).insetBy(dx: cw * 0.3, dy: 0)) }
+            }
+            g.setStrokeColor((on ? SloopStyle.fg : SloopStyle.s3).cgColor); g.setLineWidth(on ? 2 : 1); g.stroke(box)
+            let lbl = NSAttributedString(string: "\(p * 16 + 1)-\(p * 16 + 16)", attributes: [.font: SloopStyle.font(10),
+                                         .foregroundColor: on ? SloopStyle.fg : SloopStyle.fg2])
+            lbl.draw(at: CGPoint(x: box.midX - lbl.size().width / 2, y: box.maxY - 13))
+        }
+    }
     private var cartPos = 0.0                                   // the carousel's position (eases to the cursor)
 
     /// The packs as cartridges in a row: the chosen one in the middle, big and lit; loading pushes it into the slot.
@@ -319,6 +358,17 @@ final class TrigStripView: NSView, TopStrip {
             g.saveGState()
             g.setAlpha(a)
             drawPacks(g, CGRect(x: r.minX, y: r.minY, width: r.width, height: floorY - r.minY - 2), now: pt)
+            g.restoreGState()
+            if a >= 1 { return }
+            g.setAlpha(1 - a)
+        }
+        // the step pages, just after PAGE - / PAGE + (or a track with several)
+        let paged = t - pageChanged
+        if paged < Self.pageMapShown + 0.4 {
+            let a = CGFloat(min(1, (Self.pageMapShown + 0.4 - paged) / 0.4))
+            g.saveGState()
+            g.setAlpha(a)
+            drawPageMap(g, CGRect(x: r.minX, y: r.minY, width: r.width, height: floorY - r.minY - 2))
             g.restoreGState()
             if a >= 1 { return }
             g.setAlpha(1 - a)
@@ -459,20 +509,31 @@ final class TrigStripView: NSView, TopStrip {
         let nameW: CGFloat = min(96, rect.width * 0.22)
         _ = text(r.muted ? "MUTED" : r.name, chip.maxX + 6, rect.midY - size * 0.5, size: size,
                  r.muted ? SloopStyle.dim : (r.active ? SloopStyle.fg : SloopStyle.fg2))
-        // the 16 steps of the page shown
+        // the whole track (up to 4 bars), a gap between bars; the 16 steps the pads show are framed
         let gx = chip.maxX + 10 + nameW, gw = rect.maxX - gx - 14
-        let cell = gw / 16
+        let n = r.steps.count, bars = (n + 15) / 16
+        let barGap: CGFloat = bars > 1 ? 4 : 0
+        let cell = (gw - CGFloat(bars - 1) * barGap) / CGFloat(max(16, n))
+        let pad: CGFloat = cell > 8 ? 1 : 0.5
+        func x(_ i: Int) -> CGFloat { gx + CGFloat(i) * cell + CGFloat(i / 16) * barGap }
+        let cy = rect.minY + rect.height * 0.25, ch = rect.height * 0.5
         for (i, s) in r.steps.enumerated() {
-            let cr = CGRect(x: gx + CGFloat(i) * cell + 1, y: rect.minY + rect.height * 0.25, width: cell - 2, height: rect.height * 0.5)
+            let cr = CGRect(x: x(i) + pad, y: cy, width: cell - 2 * pad, height: ch)
             switch s {
-            case 255: continue
             case 1, 3: g.setFillColor((r.muted ? c.withAlphaComponent(0.3) : c).cgColor)
             case 2: g.setFillColor(c.withAlphaComponent(0.25).cgColor)
             default: g.setFillColor((i % 4 == 0 ? SloopStyle.s3 : SloopStyle.s2).cgColor)
             }
             g.fill(cr)
-            if s >= 2 { g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: cr.midX - 1.5, y: cr.maxY - 5, width: 3, height: 3)) }
+            if s >= 2 && cell > 6 { g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: cr.midX - 1.5, y: cr.maxY - 5, width: 3, height: 3)) }
             if r.playhead == i { g.setStrokeColor(SloopStyle.fg.cgColor); g.setLineWidth(2); g.stroke(cr.insetBy(dx: -1, dy: -1)) }
+        }
+        if bars > 1 && r.active {                         // the page on the pads (the active track's): a frame
+            let p = min(r.page, bars - 1)
+            let fr = CGRect(x: x(p * 16) - 2, y: cy - 4, width: x(min(n, p * 16 + 16) - 1) + cell - x(p * 16) + 4, height: ch + 8)
+            g.setStrokeColor(SloopStyle.fg.cgColor)
+            g.setLineWidth(1.5)
+            g.stroke(fr)
         }
         // level
         let lv = CGRect(x: rect.maxX - 8, y: rect.minY + 2, width: 5, height: rect.height - 4)

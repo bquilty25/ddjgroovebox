@@ -183,7 +183,8 @@ public final class TrigMapper {
         return out
     }
 
-    var pageCount: Int { max(1, (model.length(track) + 15) / 16) }
+    /// the active track's step pages (16 steps each)
+    public var pageCount: Int { max(1, (model.length(track) + 15) / 16) }
 
     private func setPage(_ p: TrigPage) -> [TrigAction] { page = p; return [] }
 
@@ -459,8 +460,10 @@ public final class TrigMapper {
         case .reloop(let d): return pageFace(d == .left ? .fltr : .lfo)
         case .callLeft(.left): return ControlFace(title: "TRK -")
         case .callRight(.left): return ControlFace(title: "TRK +")
-        case .callLeft(.right): return ControlFace(title: "PAGE -", light: stepPage > 0 ? .dim : .off)
-        case .callRight(.right): return ControlFace(title: "PAGE +", light: stepPage < pageCount - 1 ? .dim : .off)
+        case .callLeft(.right):                          // (the value: which of the track's step pages the pads show)
+            return ControlFace(title: "PAGE -", value: "\(stepPage + 1)/\(pageCount)", light: stepPage > 0 ? .dim : .off)
+        case .callRight(.right):
+            return ControlFace(title: "PAGE +", value: "\(stepPage + 1)/\(pageCount)", light: stepPage < pageCount - 1 ? .dim : .off)
         case .load(let d):
             if let st = heldSteps.first {
                 let sv = model.step(track: track, step: st)

@@ -317,7 +317,18 @@ final class AppController: NSObject, NSWindowDelegate {
             (3.0, DDJEvent(.browsePress, .press(true))),                        // load it
             (3.1, DDJEvent(.browsePress, .press(false))),
         ]
-        let trigScript = ProcessInfo.processInfo.environment["DDJ_PACKS"] != nil ? packs : trig
+        let pages: [(Double, DDJEvent)] = [                                     // DDJ_PAGES: the step pages
+            (0.3, DDJEvent(.play(.left), .press(true))),
+            (0.4, DDJEvent(.play(.left), .press(false))),
+            (0.6, DDJEvent(.pad(.right, 0), .press(true), padMode: .beatJump)),     // track 5: the 4-bar bass
+            (0.7, DDJEvent(.pad(.right, 0), .press(false), padMode: .beatJump)),
+            (2.6, DDJEvent(.callRight(.right), .press(true))),                     // PAGE +, twice: steps 33-48
+            (2.7, DDJEvent(.callRight(.right), .press(false))),
+            (2.9, DDJEvent(.callRight(.right), .press(true))),
+            (3.0, DDJEvent(.callRight(.right), .press(false))),
+        ]
+        let env = ProcessInfo.processInfo.environment
+        let trigScript = env["DDJ_PACKS"] != nil ? packs : env["DDJ_PAGES"] != nil ? pages : trig
         let script: [(Double, DDJEvent)] = instrument is TrigInstrument ? trigScript : [
             (0.5, DDJEvent(.pad(.right, 7), .press(true), padMode: .sampler)),
             (0.6, DDJEvent(.pad(.right, 7), .press(false), padMode: .sampler)),

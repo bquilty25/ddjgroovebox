@@ -458,11 +458,17 @@ static void render_segment(float *out, int n)
     float tap_dly[2][TD_BLK], tap_rev[2][TD_BLK];
     memset(tap_dly, 0, sizeof tap_dly);
     memset(tap_rev, 0, sizeof tap_rev);
+    static float xo_g1, xo_g2;                                 /* (the DJ EQ's crossovers: 250 Hz, 2.5 kHz) */
+    if (xo_g1 == 0.f) { xo_g1 = svf_g(250.f); xo_g2 = svf_g(2500.f); }
     for (int d = 0; d < TD_DECKS; d++) {
         td_deck_t *k = &E.deck[d];
         float *ring = td_ring[d];
         float pk = k->meter * mdecay;
         int ins_here = E.ins.active && E.ins.target == d;
+        /* the DJ filter, per segment: low-pass down to 200 Hz (below 0), high-pass up to 5 kHz (above 0) */
+        k->flt_s += (k->flt_t - k->flt_s) * fminf(1.f, (float)n * 0.004f);
+        int fmode = k->flt_s < -0.03f ? -1 : (k->flt_s > 0.03f ? 1 : 0);
+        float fg = fmode < 0 ? svf_g(20000.f * powf(0.01f, -k->flt_s)) : (fmode > 0 ? svf_g(20.f * powf(250.f, k->flt_s)) : 0.f);
         for (int i = 0; i < n; i++) {
             k->drive_s += (k->drive_t - k->drive_s) * 0.0042f;
             k->level_s += (k->level_t * k->level_t - k->level_s) * 0.0042f;
@@ -496,11 +502,29 @@ static void render_segment(float *out, int n)
                 ins_tick(&l, &r);
                 take = fmaxf(take, ins_takeover());
             }
-            l *= k->level_s;
-            r *= k->level_s;
+            /* the DJ EQ (the knobs' bands times the Smart Fader's), the DJ filter, the Smart Fader's volume */
+            for (int b = 0; b < 3; b++) k->eq_s[b] += (k->eq_t[b] - k->eq_s[b]) * 0.0042f;
+            for (int j = 0; j < 4; j++) k->sf_s[j] += (k->sf_t[j] - k->sf_s[j]) * 0.0042f;
+            float gb[3] = {k->eq_s[0] * k->sf_s[1], k->eq_s[1] * k->sf_s[2], k->eq_s[2] * k->sf_s[3]};
+            float *ch[2] = {&l, &r};
+            for (int c = 0; c < 2; c++) {
+                float x = *ch[c], lp, bp, hp, lp2, bp2, hp2;
+                svf_run(&k->xo1[c], x, xo_g1, 1.4142f, &lp, &bp, &hp);
+                float rest = x - lp;                           /* (low + mid + high = x exactly) */
+                svf_run(&k->xo2[c], rest, xo_g2, 1.4142f, &lp2, &bp2, &hp2);
+                float y = gb[0] * lp + gb[1] * (rest - hp2) + gb[2] * hp2;
+                if (fmode) {
+                    svf_run(&k->flt[c], y, fg, 1.1f, &lp, &bp, &hp);
+                    y = fmode < 0 ? lp : hp;
+                }
+                *ch[c] = y;
+            }
+            float vol = k->sf_s[0];
+            l *= k->level_s * vol;
+            r *= k->level_s * vol;
             dk[d][0][i] = l;
             dk[d][1][i] = r;
-            float sg = k->level_s * (1.f - take);
+            float sg = k->level_s * vol * (1.f - take);
             for (int s = 0; s < 3; s++) {
                 snd[d][s][0][i] *= sg;
                 snd[d][s][1][i] *= sg;
@@ -600,6 +624,8 @@ static int ev_cmp(const td_event_t *a, int oa, const td_event_t *b, int ob)
     if (a->type != b->type) return a->type < b->type ? -1 : 1;
     return a->t < b->t ? -1 : (a->t > b->t ? 1 : 0);
 }
+static void blend_tick(void);                                  /* (DJ decks, below) */
+
 static void render_block(float *out)
 {
     td_event_t ev[TD_EVQ + 64];
@@ -643,6 +669,7 @@ static void render_block(float *out)
         }
     }
     td_auto_block();
+    blend_tick();
 }
 
 static void snap_gains(void)
@@ -694,7 +721,10 @@ int td_init(void)
     for (int d = 0; d < TD_DECKS; d++) {
         E.deck[d].level_t = 1.f;
         E.deck[d].level_s = 1.f;
+        for (int b = 0; b < 3; b++) E.deck[d].eq_t[b] = E.deck[d].eq_s[b] = 1.f;
+        for (int j = 0; j < 4; j++) E.deck[d].sf_t[j] = E.deck[d].sf_s[j] = 1.f;
     }
+    E.blend_full_since = -1.0;
     E.dly.buf = g_dly_buf;
     E.dly.rng = 0xDE1A7u;
     E.thr.buf = g_thr_buf;
@@ -782,12 +812,17 @@ void td_play(int on)
         if (on && !E.playing) {                                /* the deck on air starts (its queued pattern first) */
             td_dk_t *dk = &E.dk[E.on_air];
             if (dk->queued >= 0) { dk->pat = dk->queued; dk->queued = -1; td_pattern_tempo(); td_sync_cur(); }
-            for (int d = 0; d < TD_DECKS; d++) E.dk[d].playing = d == E.on_air;
+            for (int d = 0; d < TD_DECKS; d++) {
+                E.dk[d].playing = d == E.on_air;
+                for (int j = 0; j < 4; j++) E.deck[d].sf_t[j] = E.deck[d].sf_s[j] = 1.f;   /* (no blend) */
+            }
+            E.blending = 0;
             td_seq_reset_transport();
             E.playing = 1;
             if (E.midi_clock) td_midi_push(0xFA, 0, 0, 1, (int64_t)E.frames_int);
         } else if (!on && E.playing) {
             E.playing = 0;
+            E.blending = 0;
             for (int d = 0; d < TD_DECKS; d++) E.dk[d].playing = 0;
             td_seq_stop_notes();
             if (E.midi_clock) td_midi_push(0xFC, 0, 0, 1, (int64_t)E.frames_int);
@@ -798,6 +833,53 @@ void td_play(int on)
 
 /* ---- (DJ decks) */
 static int ok_d(int d) { return d >= 0 && d < TD_DECKS && E.inited; }
+static float smooth01(float x) { x = clampf(x, 0.f, 1.f); return x * x * (3.f - 2.f * x); }
+static float pat_bpm(int p) { return E.pat[p].bpm10 ? clampf((float)E.pat[p].bpm10 * 0.1f, 30.f, 300.f) : E.bpm; }
+static void deck_as_is(int d, int snap)                        /* a deck's Smart Fader gains back to 1 */
+{
+    for (int j = 0; j < 4; j++) {
+        E.deck[d].sf_t[j] = 1.f;
+        if (snap) E.deck[d].sf_s[j] = 1.f;
+    }
+}
+/* The Smart Fader at x (0: the deck on air alone .. 1: the new deck alone). Volumes: equal-power, the new deck full by
+ * the middle, the old one full until the middle. The bass swaps around the middle (never two basslines); the new deck's
+ * mids and highs ease in, the old deck's ease out. The tempo glides from the old pattern's to the new one's. */
+static void blend_gains(void)
+{
+    float x = clampf(E.blend_x, 0.f, 1.f);
+    int to = E.blend_to, from = 1 - to;
+    td_deck_t *in = &E.deck[to], *out = &E.deck[from];
+    float vin = sinf(fminf(1.f, x * 2.f) * 1.5707963f), vout = cosf(fmaxf(0.f, (x - 0.5f) * 2.f) * 1.5707963f);
+    float swap = smooth01((x - 0.45f) / 0.1f), ease = smooth01(x * 2.f), fade = smooth01((x - 0.5f) * 2.f);
+    in->sf_t[0] = vin;  in->sf_t[1] = swap;        in->sf_t[2] = 0.5f + 0.5f * ease; in->sf_t[3] = 0.3f + 0.7f * ease;
+    out->sf_t[0] = vout; out->sf_t[1] = 1.f - swap; out->sf_t[2] = 1.f - 0.5f * fade; out->sf_t[3] = 1.f - 0.7f * fade;
+    E.bpm = E.bpm_from + (E.bpm_to - E.bpm_from) * smooth01(x);
+}
+static void blend_end(void)                                    /* the knobs' EQ and filters back to flat */
+{
+    E.blending = 0;
+    E.blend_full_since = -1.0;
+    for (int d = 0; d < TD_DECKS; d++) {
+        for (int b = 0; b < 3; b++) E.deck[d].eq_t[b] = 1.f;
+        E.deck[d].flt_t = 0.f;
+    }
+}
+static void blend_tick(void)                                   /* (each block) a bar at x = 1: the blend is done */
+{
+    if (!E.blending) return;
+    if (E.blend_x < 0.999f) { E.blend_full_since = -1.0; return; }
+    if (E.blend_full_since < 0.0) { E.blend_full_since = E.gpos; return; }
+    if (E.gpos - E.blend_full_since < 16.0) return;
+    int to = E.blend_to, from = 1 - to;
+    E.dk[from].playing = 0;                                    /* (its gain stays at 0: its tails fade out under it) */
+    td_seq_stop_deck(from);
+    E.on_air = E.focus = to;
+    td_sync_cur();
+    E.bpm = E.bpm_to;
+    deck_as_is(to, 0);
+    blend_end();
+}
 void td_deck_play(int deck, int on)
 {
     td_lock();
@@ -806,6 +888,8 @@ void td_deck_play(int deck, int on)
         if (on && !E.playing) {                                /* the clock starts with this deck, at once */
             E.on_air = deck;
             td_pattern_tempo();
+            for (int d = 0; d < TD_DECKS; d++) deck_as_is(d, 1);
+            blend_end();
             td_unlock();
             td_play(1);
             return;
@@ -817,6 +901,17 @@ void td_deck_play(int deck, int on)
             dk->dec_pat = dk->pat;
             dk->playing = 1;
             td_sync_cur();
+            if (E.dk[1 - deck].playing) {                      /* the other deck plays: a blend begins, at x 0 */
+                E.blending = 1;
+                E.blend_to = deck;
+                E.blend_x = 0.f;
+                E.blend_full_since = -1.0;
+                E.bpm_from = E.bpm;
+                E.bpm_to = pat_bpm(dk->pat);
+                blend_gains();
+                for (int j = 0; j < 4; j++) E.deck[deck].sf_s[j] = E.deck[deck].sf_t[j];   /* (silent from its start) */
+            } else
+                deck_as_is(deck, 1);
         } else if (!on && dk->playing) {
             dk->playing = 0;
             td_seq_stop_deck(deck);
@@ -826,9 +921,38 @@ void td_deck_play(int deck, int on)
                 td_play(0);
                 return;
             }
+            if (E.blending) {                                  /* a blend called off: the other deck alone, as is */
+                if (deck == E.blend_to) E.bpm = E.bpm_from;
+                deck_as_is(other, 0);
+                blend_end();
+            }
             if (E.on_air == deck) { E.on_air = other; td_pattern_tempo(); }
         }
     }
+    td_unlock();
+}
+void td_blend_fader(float x)
+{
+    td_lock();
+    if (E.inited && E.blending && x == x) {
+        E.blend_x = clampf(x, 0.f, 1.f);
+        blend_gains();
+    }
+    td_unlock();
+}
+void td_deck_eq(int deck, int band, float x)
+{
+    td_lock();
+    if (ok_d(deck) && band >= 0 && band < 3 && x == x) {       /* 0 kill .. 0.5 flat .. 1 +6 dB */
+        x = clampf(x, 0.f, 1.f);
+        E.deck[deck].eq_t[band] = x < 0.5f ? (x * 2.f) * (x * 2.f) : 1.f + (x - 0.5f) * 2.f;
+    }
+    td_unlock();
+}
+void td_deck_filter(int deck, float x)
+{
+    td_lock();
+    if (ok_d(deck) && x == x) E.deck[deck].flt_t = clampf(x, -1.f, 1.f);
     td_unlock();
 }
 void td_deck_pattern(int deck, int pattern)
@@ -1276,6 +1400,16 @@ void td_get_state(td_state_t *s)
                 s->deck_length[d][t] = len;
                 s->deck_track_level[d][t] = fminf(1.f, E.trk[rt].peak);
             }
+        }
+        s->blending = E.blending;
+        s->blend_to = E.blend_to;
+        s->blend_x = E.blend_x;
+        s->bpm_from = E.bpm_from;
+        s->bpm_to = E.bpm_to;
+        for (int d = 0; d < TD_DECKS; d++) {
+            const td_deck_t *k = &E.deck[d];
+            s->deck_gain[d] = k->sf_s[0];
+            for (int b = 0; b < 3; b++) s->deck_band[d][b] = k->eq_s[b] * k->sf_s[b + 1];
         }
         int f = E.focus;
         s->pattern = E.dk[f].pat;

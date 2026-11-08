@@ -316,6 +316,12 @@ typedef struct {
     float dc_x[2], dc_y[2];
     float meter;
     int captures;
+    /* (DJ decks) the DJ EQ (3 bands split at 250 Hz and 2.5 kHz, by subtraction: unity gains give the input back), the
+     * DJ filter (low-pass below 0, high-pass above), and the Smart Fader's gains (its volume and bands, set per blend) */
+    float eq_t[3], eq_s[3];                                    /* the knobs' band gains: 0 kill .. 1 unity .. 2 (+6 dB) */
+    float flt_t, flt_s;                                        /* -1 .. 1; 0 off */
+    float sf_t[4], sf_s[4];                                    /* the Smart Fader: volume, low, mid, high (1: as is) */
+    td_svf_t xo1[2], xo2[2], flt[2];
 } td_deck_t;
 
 typedef struct {                                               /* the performance insert (REPEAT .. CRUSH) */
@@ -380,6 +386,11 @@ typedef struct {
     int playing, recording, fill_user;                         /* playing: the clock runs (a deck or both) */
     td_dk_t dk[TD_DECKS];                                      /* (DJ decks) each deck's pattern and timing */
     int focus, on_air;                                         /* the deck edited; the deck heard (its tempo, scenes) */
+    /* (DJ decks) a blend: from the deck on air to the deck started; the Smart Fader at x (0 from .. 1 to); the tempo
+     * glides between the two patterns' tempos; at x = 1 for a bar the blend ends (the old deck stops) */
+    int blending, blend_to;
+    float blend_x, bpm_from, bpm_to;
+    double blend_full_since;                                   /* (steps) when x reached 1; < 0: not there */
     int cur;                                                   /* the edited pattern: always dk[focus].pat (td_sync_cur) */
     int64_t kdec;
     int64_t next_bar, next_clk;                                /* the next bar line and MIDI clock pulse to send */

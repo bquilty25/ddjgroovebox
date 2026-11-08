@@ -326,6 +326,81 @@ TEST(test_decks)
     check("the last deck stopped: the clock stops", !st.playing);
 }
 
+static float rms_of(int frames)                                /* renders, returns the RMS */
+{
+    static float b[2 * 4800];
+    double e = 0;
+    int left = frames;
+    while (left > 0) {
+        int k = left > 4800 ? 4800 : left;
+        td_render(b, (uint32_t)k, 0);
+        drain_midi(rendered);
+        rendered += k;
+        for (int i = 0; i < 2 * k; i++) e += (double)b[i] * b[i];
+        left -= k;
+    }
+    return (float)sqrt(e / (2.0 * frames));
+}
+
+/* (DJ decks) a blend: the Smart Fader's gains, the bass swap, the tempo glide, the end; the DJ EQ */
+TEST(test_blend)
+{
+    setup_empty(120);
+    E.pat[12].bpm10 = 1200;
+    td_set_machine(0, TD_M_KICK);
+    for (int s = 0; s < 16; s += 4) td_step_note(0, s, 36, 120);   /* deck A: P13, a kick each beat, 120 BPM */
+    td_deck_pattern(1, 13);
+    E.pat[13].bpm10 = 1300;
+    td_focus(1);
+    td_set_machine(0, TD_M_KICK);
+    for (int s = 0; s < 16; s += 4) td_step_note(0, s, 36, 120);   /* deck B: P14, the same at 130 */
+    td_focus(0);
+    td_play(1);
+    rms_of(96000);
+    td_deck_play(1, 1);
+    td_state_t st;
+    td_get_state(&st);
+    check("PLAY on the waiting deck: a blend to it, at x 0 (it is silent)", st.blending && st.blend_to == 1
+          && st.deck_gain[1] < 0.01f && st.deck_gain[0] > 0.99f && fabsf(st.bpm - 120.f) < 0.01f);
+    td_blend_fader(0.5f);
+    rms_of(4800);
+    td_get_state(&st);
+    char msg[160];
+    snprintf(msg, sizeof msg, "x 0.5: both decks full (%.2f %.2f), the lows half swapped (%.2f %.2f), 125 BPM (%.1f)",
+             st.deck_gain[0], st.deck_gain[1], st.deck_band[0][0], st.deck_band[1][0], st.bpm);
+    check(msg, st.deck_gain[0] > 0.98f && st.deck_gain[1] > 0.98f && fabsf(st.deck_band[0][0] - 0.5f) < 0.05f
+          && fabsf(st.deck_band[1][0] - 0.5f) < 0.05f && fabsf(st.bpm - 125.f) < 0.05f);
+    td_blend_fader(0.4f);
+    rms_of(4800);
+    td_get_state(&st);
+    check("x 0.4: the old deck's bass, not the new one's (no two basslines)", st.deck_band[0][0] > 0.98f && st.deck_band[1][0] < 0.02f);
+    td_blend_fader(1.f);
+    rms_of(4800);
+    td_get_state(&st);
+    check("x 1: the old deck gone, the new one alone at 130 BPM", st.deck_gain[0] < 0.01f && st.deck_gain[1] > 0.99f
+          && fabsf(st.bpm - 130.f) < 0.01f && st.blending);
+    rms_of(48000 * 60 * 4 / 130 + 9600);                       /* a bar at 130 BPM, and a little */
+    td_get_state(&st);
+    check("a bar at 1: the blend is done (A stopped; B on air and edited)", !st.blending && st.on_air == 1 && st.focus == 1
+          && !st.deck_playing[0] && st.deck_playing[1] && st.pattern == 13);
+    /* the DJ EQ: the low band killed takes the kick's body away; flat gives it back */
+    float flat = rms_of(48000);
+    td_deck_eq(1, 0, 0.f);
+    rms_of(4800);
+    float kill = rms_of(48000);
+    snprintf(msg, sizeof msg, "the DJ EQ's low kill takes the kick's weight (%.1f dB)", 20.f * log10f(kill / flat));
+    check(msg, kill < flat * 0.4f);
+    /* called off: a blend back to A, A stopped again: B alone at its tempo */
+    td_deck_eq(1, 0, 0.5f);
+    td_deck_play(0, 1);
+    td_blend_fader(0.7f);
+    rms_of(4800);
+    td_deck_play(0, 0);
+    td_get_state(&st);
+    check("a blend called off (the new deck stopped): the other alone, as is, its tempo back", !st.blending && st.on_air == 1
+          && st.deck_gain[1] > 0.5f && fabsf(st.bpm - 130.f) < 0.01f);
+}
+
 TEST(test_pattern_queue)
 {
     setup_empty(120);
@@ -1367,6 +1442,7 @@ int main(void)
     RUN(test_locks);
     RUN(test_pattern_queue);
     RUN(test_decks);
+    RUN(test_blend);
     RUN(test_scenes);
     RUN(test_scratch);
     RUN(test_perf);

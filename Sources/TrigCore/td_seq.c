@@ -479,7 +479,7 @@ void td_seq_apply(const td_event_t *ev, int64_t frame)
         dk->origin = (int64_t)llround(ev->t);
         if (dk->queued == ev->pat)
             dk->queued = -1;
-        if (ev->track == E.on_air) td_pattern_tempo();
+        if (ev->track == E.on_air && !E.blending) td_pattern_tempo();   /* (a blend glides the tempo itself) */
         td_sync_cur();
         break;
     }

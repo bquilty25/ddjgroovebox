@@ -106,6 +106,13 @@ void td_deck_play(int deck, int on);
 void td_deck_pattern(int deck, int pattern);             /* at once when the deck is stopped, else at its pattern's end */
 void td_focus(int deck);                                 /* the deck the editing API edits */
 void td_on_air(int deck);                                /* the deck heard: its tempo and its scenes */
+/* A deck started while the other plays begins a blend: the Smart Fader (td_blend_fader, 0 the deck on air alone .. 1
+ * the new deck alone) moves the decks' volumes, swaps their basses around the middle, eases the new deck's mids and
+ * highs in, and glides the tempo from the old pattern's to the new one's. At 1 for a bar the blend is done: the old
+ * deck stops, the new one is on air and edited. Stopping either deck calls it off. */
+void td_blend_fader(float x);
+void td_deck_eq(int deck, int band, float x);            /* the DJ EQ: band 0 low, 1 mid, 2 high; 0 kill, 0.5 flat, 1 +6 dB */
+void td_deck_filter(int deck, float x);                  /* the DJ filter: -1 low-pass .. 0 off .. 1 high-pass */
 void td_restart(void);                                   /* back to step 1 (playing or not) */
 void td_set_tempo(float bpm);                            /* 30 .. 300 */
 void td_tap_tempo(void);
@@ -211,6 +218,9 @@ typedef struct {
     int32_t deck_step[TD_DECKS][TD_TRACKS], deck_machine[TD_DECKS][TD_TRACKS];
     int32_t deck_muted[TD_DECKS][TD_TRACKS], deck_length[TD_DECKS][TD_TRACKS];
     float deck_track_level[TD_DECKS][TD_TRACKS];
+    int32_t blending, blend_to;                          /* a blend from the deck on air to blend_to */
+    float blend_x, bpm_from, bpm_to;                     /* the Smart Fader; the tempos it glides between */
+    float deck_gain[TD_DECKS], deck_band[TD_DECKS][3];   /* each deck's volume and low / mid / high gains now (1: as is) */
 } td_state_t;
 void td_get_state(td_state_t *s);
 /* the value a parameter has right now on a track, after locks, scenes and the LFO (for the knobs' arcs) */

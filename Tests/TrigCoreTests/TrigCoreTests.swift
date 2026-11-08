@@ -62,7 +62,7 @@ final class TrigCoreTests: XCTestCase {
         XCTAssertEqual(st.pattern, 0)
         XCTAssertEqual(st.bpm, 124, accuracy: 0.01)
         XCTAssertEqual(st.length.0, 16)
-        XCTAssertEqual(st.length.6, 16)
+        XCTAssertEqual(st.length.6, 64, "the melody runs over the 4-bar progression")
         XCTAssertEqual(st.machine.0, m(TD_M_KICK))
         var steps = [td_step_view_t](repeating: td_step_view_t(), count: Int(TD_STEPS))
         td_steps_get(0, &steps)

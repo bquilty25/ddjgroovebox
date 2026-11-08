@@ -1085,23 +1085,32 @@ TEST(test_default_project)
     td_get_state(&st);
     int four = 1, lengths = 1;
     for (int s = 0; s < 16; s++) four &= E.pat[0].step[0][s].trig == (s % 4 == 0 || s >= 14);   /* (14, 15: FILL) */
-    for (int t = 0; t < TD_TRACKS; t++) lengths &= st.length[t] == 16;
-    check("opens on P01, house / techno at 124 BPM: four on the floor, 16 steps",
+    for (int t = 0; t < TD_TRACKS; t++) lengths &= st.length[t] == (t >= 4 && t <= 6 ? 64 : 16);
+    check("opens on P01, deep house at 124 BPM: four on the floor; bass, chords, melody over 4 bars",
           st.pattern == 0 && fabsf(st.bpm - 124.f) < 0.01f && four && lengths && E.pat[0].step[0][14].cond == TD_COND_FILL);
-    check("P02, its breakdown: no kick, no clap, the rest as P01",
-          !E.pat[1].step[0][0].trig && !E.pat[1].step[2][4].trig && E.pat[1].step[3][0].trig && E.pat[1].step[4][2].trig);
-    check("P03 dub techno (polymetric 16, 12, 10, 7), P05 electro (track 3 a snare)",
-          E.pat[2].length[3] == 12 && E.pat[2].length[5] == 10 && E.pat[2].length[6] == 7 && E.pat[4].machine[2] == TD_M_SNARE);
+    int chordTypes = 0;                                        /* the stabs lock the progression's chord types */
+    for (int b = 0; b < 4; b++)
+        for (int k = 0; k < E.pat[0].step[5][b * 16 + 2].nlocks; k++)
+            if (E.pat[0].lock[5][b * 16 + 2][k].param == P_SRC + SY_CHORD) chordTypes |= 1 << E.pat[0].lock[5][b * 16 + 2][k].value;
+    check("P01's chords: minor 9, major 7, minor 7 locked per bar", chordTypes == ((1 << 3) | (1 << 2) | (1 << 1)));
+    check("P02 techno: the rumble (off-sixteenths), a 24-step stab, a 12-step tom",
+          E.pat[1].step[4][1].trig && !E.pat[1].step[4][4].trig && E.pat[1].length[5] == 24 && E.pat[1].length[6] == 12
+          && E.pat[1].machine[6] == TD_M_TOM);
+    check("P03 dub techno (polymetric 16, 12, 10, 7), P05 electro and P06 garage (track 3 a snare)",
+          E.pat[2].length[3] == 12 && E.pat[2].length[5] == 10 && E.pat[2].length[6] == 7 && E.pat[4].machine[2] == TD_M_SNARE
+          && E.pat[5].machine[2] == TD_M_SNARE);
+    check("P06 garage: the skipping kick (1, the 'and' of 3), shuffled hats",
+          E.pat[5].step[0][0].trig && E.pat[5].step[0][10].trig && !E.pat[5].step[0][4].trig && E.pat[5].step[3][1].micro > 0);
     int slides = 0, empty = 1;
-    for (int s = 0; s < 16; s++) slides += E.pat[3].step[4][s].slide;
-    for (int p = 5; p < TD_PATTERNS; p++)
+    for (int s = 0; s < 32; s++) slides += E.pat[3].step[4][s].slide;
+    for (int p = 8; p < TD_PATTERNS; p++)
         for (int t = 0; t < TD_TRACKS; t++)
             for (int s = 0; s < TD_STEPS; s++) empty &= !E.pat[p].step[t][s].trig;
-    check("P04 acid slides; P06..P16 empty, with P01's sounds",
-          slides >= 3 && empty && !memcmp(E.pat[15].param, E.pat[0].param, sizeof E.pat[0].param));
+    check("P04 acid: 2 bars, slides; P09..P16 empty, with P01's sounds",
+          E.pat[3].length[4] == 32 && slides >= 6 && empty && !memcmp(E.pat[15].param, E.pat[0].param, sizeof E.pat[0].param));
     const int N = (int)(48000 * 60 / 124.0 * 4 * 8);
     static float b[2 * 1024];
-    for (int p = 0; p < 5; p++) {                              /* each of the five, 8 bars */
+    for (int p = 0; p < 8; p++) {                              /* each of the eight, 8 bars */
         td_init();
         td_pattern_queue(p);
         td_play(1);
@@ -1131,7 +1140,8 @@ TEST(test_default_project)
 /* ---- sound packs */
 TEST(test_packs)
 {
-    check("seven packs, named", td_pack_count() == 7 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS"));
+    check("eleven packs, named", td_pack_count() == 11 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS")
+          && !strcmp(td_pack_name(10), "BREAKS"));
     for (int k = 0; k < td_pack_count(); k++) {
         td_init();                                             /* P01: the house beat */
         td_step_t before = E.pat[0].step[0][0];

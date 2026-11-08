@@ -14,13 +14,14 @@ page shown. Pads show the active track's steps; the jogs show their deck's four 
 tracks at once. The guide ([TRIGDECK.md](TRIGDECK.md), Help menu) explains the rest.
 
 **My first beat?**
-Press PLAY: the house / techno pattern starts. Move the crossfader (scenes), touch a jog and move it (scratch), hold
+Press PLAY: the deep house pattern starts. Move the crossfader (scenes), touch a jog and move it (scratch), hold
 SHIFT and press the left BEAT SYNC (AUTOPILOT). To write: HOT CUE mode, tap pads to set steps; hold a pad and turn a
 knob to lock that value on that step.
 
 **What other patterns are there?**
-P01 house / techno, P02 its breakdown, P03 dub techno, P04 acid, P05 electro; P06 to P16 are empty, with P01's sounds.
-In SAMPLER mode the left pads 1-5 switch to them at the end of the bar (LOAD ◀ ▶ also steps through them).
+P01 deep house, P02 techno, P03 dub techno, P04 acid, P05 electro, P06 garage, P07 disco, P08 breaks; P09 to P16 are
+empty, with P01's sounds. In SAMPLER mode the left pads 1-8 switch to them at the end of the pattern (LOAD ◀ ▶ also
+steps through them). Their kits are also sound packs: on the MASTER page, BROWSE chooses one, push loads it.
 
 **Do I need the DDJ-400?**
 No. Click and drag the drawing, scroll over a jog or BROWSE, or play the Mac keyboard: 1-8 and Q-I are the pads, space

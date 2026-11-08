@@ -5,7 +5,7 @@ what it does right now and shows its value: you never have to translate between 
 
 ## Your first minute
 
-1. Press **PLAY** (either deck). The house / techno pattern TRIGDECK opens with starts.
+1. Press **PLAY** (either deck). The deep house pattern TRIGDECK opens with starts.
 2. Touch the **left jog's top** and move it: you are scratching deck A (kick, open hat, clap, closed hats) while the pattern runs
    on underneath. Let go: it drops back in time.
 3. Move the **crossfader** left and right: the pattern morphs into scene A and scene B. The middle is the pattern as
@@ -17,17 +17,20 @@ what it does right now and shows its value: you never have to translate between 
 
 ## Patterns to start from
 
-A new project holds five patterns, at 124 BPM in A minor. Switch with the pads in SAMPLER mode (left deck pads 1-5) or
-with LOAD ◀ ▶; the switch happens at the end of the bar.
+A new project holds eight patterns, classic grooves at 124 BPM in A minor. Switch with the pads in SAMPLER mode (left
+deck pads 1-8) or with LOAD ◀ ▶; the switch happens at the end of the pattern (P01 runs over 4 bars).
 
 | Pattern | What it is |
 |---|---|
-| P01 HOUSE / TECHNO | four on the floor, open hats on the off-beats, clap on 2 and 4, closed sixteenths with ghosts, a rolling off-beat bass, a minor 9 stab into the delay, an FM pluck, a vocal blip every fourth bar. Hold the left BEAT SYNC (FILL): kicks and a clap roll at the end of the bar |
-| P02 BREAKDOWN | P01 without the kick and the clap, to mix in and out |
+| P01 DEEP HOUSE | 4 bars over Am9, Dm9, Fmaj7, Em7: four on the floor, shuffled hats, clap on 2 and 4, a syncopated bass on the roots with octave ghosts and slides, chord stabs into the delay, an FM pluck melody, a vocal every fourth bar. Hold the left BEAT SYNC (FILL): kicks and a clap roll |
+| P02 TECHNO | a driving kick, a ride, sixteenth hats, the rolling sub on the off-sixteenths, a stab on a 24-step loop, a 12-step tom pattern, a riser every 8 bars |
 | P03 DUB TECHNO | polymetric (16, 12, 10 and 7 steps), a chord stab into the tape delay, after DUB-1 |
-| P04 ACID | the four-on-the-floor beat under a resonant 303-style line with slides and accents |
+| P04 ACID | a 2-bar 303-style line (the second bar answers), the filter opening across it |
 | P05 ELECTRO | broken kicks, a snare on 2 and 4, a square bass, an FM zap |
-| P06-P16 | empty, with P01's sounds: write your own |
+| P06 GARAGE | UK 2-step: the skipping kick, ghost snares, heavily shuffled hats, a sliding sub, organ stabs |
+| P07 DISCO | octave bass over Am7, Dm7, Gmaj7, Cmaj7, off-beat chord stabs, claps, an FM brass hit |
+| P08 BREAKS | a syncopated kick, ghost snares, swung eighths, a bass answering the kick, a pad |
+| P09-P16 | empty, with P01's sounds: write your own |
 
 Each has its own scenes on the crossfader: on P01, scene A is a filtered breakdown and scene B opens and drives the
 bass and the stab.
@@ -45,7 +48,7 @@ kit the load replaced (again: back to the pack).
 | 808 | a long sine kick, metallic hats, a two-tone snare, a gliding sub bass, a major 7 chord, a tom, a cowbell |
 | 909 | a punchy kick with click and drive, bright hats, a clap, a saw bass, a minor 7 stab, a snappy snare, the vocal |
 | KEYS | a soft kit, a round bass, an FM electric piano and its chords, a slow pad |
-| HOUSE, DUB, ACID, ELECTRO | the kits of the default patterns |
+| HOUSE, TECHNO, DUB, ACID, ELECTRO, GARAGE, DISCO, BREAKS | the kits of the default patterns |
 
 ## How to read the controller
 

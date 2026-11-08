@@ -1,40 +1,53 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// The TRIGDECK engine on the browser's audio thread. The page sends calls ({call, args}); 20 times a second this sends
-// back the state (pattern, tempo, playheads, levels, the current pattern's trigs).
+// The TRIGDECK engine on the browser's audio thread. The page sends engine calls ({ calls: [[name, ...args]] }) and
+// save requests; this renders, and ~30 times a second posts a snapshot of the state (src/engine.js reads it): the
+// light part every time, the heavy part (steps, locks, scenes) when the pattern changed.
+import { instantiate } from "./src/wasi.js";
+
 class TrigdeckProcessor extends AudioWorkletProcessor {
     constructor(options) {
         super();
         this.blocks = 0;
+        this.hash = null;
         try {
-            const module = new WebAssembly.Module(options.processorOptions.wasm);   // (synchronous: allowed off the main thread)
-            this.x = new WebAssembly.Instance(module, {}).exports;
-            this.x._initialize();
+            this.x = instantiate(options.processorOptions.wasm);
             this.x.tdw_init();
+            const saved = options.processorOptions.project;
+            if (saved && saved.length <= this.x.tdw_project_size()) {
+                new Uint8Array(this.x.memory.buffer, this.x.tdw_project_buf(), saved.length).set(saved);
+                if (this.x.tdw_project_load(saved.length) !== 0) this.port.postMessage({ error: "the saved project could not be read: the default patterns instead" });
+            }
         } catch (err) {
-            this.port.postMessage({ error: String(err) });
+            this.port.postMessage({ error: "the engine did not start: " + String(err) });
             this.x = null;
             return;
         }
-        this.port.onmessage = (e) => {
-            const { call, args } = e.data;
-            if (typeof this.x[call] === "function") this.x[call](...(args || []));
-            if (e.data.state) this.sendState();
-        };
-        this.sendState();
+        this.port.onmessage = (e) => this.receive(e.data);
+        this.post(true);
     }
 
-    sendState() {
-        const x = this.x;
-        x.tdw_state();
-        const tracks = [];
-        for (let t = 0; t < 8; t++) {
-            tracks.push({ step: x.tdw_step(t), level: x.tdw_level(t), length: x.tdw_length(t), machine: x.tdw_machine(t), muted: x.tdw_muted(t) });
+    receive(m) {
+        if (!this.x) return;
+        for (const [name, ...args] of m.calls || []) {
+            if (typeof this.x[name] === "function") this.x[name](...args);
         }
-        const grid = new Float32Array(x.memory.buffer, x.tdw_grid(), 8 * 64).slice();
-        this.port.postMessage({
-            state: { pattern: x.tdw_pattern(), queued: x.tdw_queued(), bpm: x.tdw_bpm(), playing: x.tdw_playing(), tracks },
-            grid,
-        });
+        if (m.save) {
+            const n = this.x.tdw_project_save();
+            if (n > 0) this.port.postMessage({ project: new Uint8Array(this.x.memory.buffer, this.x.tdw_project_buf(), n).slice() });
+        }
+        if (m.calls?.length) this.post(false);                // (at once after an edit: the screen follows)
+    }
+
+    post(forceHeavy) {
+        const x = this.x;
+        const hash = x.tdw_pattern_hash();
+        const full = forceHeavy || hash !== this.hash;
+        this.hash = hash;
+        const all = new Int32Array(x.memory.buffer, x.tdw_snapshot(full ? 1 : 0), x.tdw_snapshot_len(full ? 1 : 0));
+        const light = all.slice(0, x.tdw_snapshot_len(0));
+        const msg = { light };
+        if (full) msg.heavy = all.slice();
+        this.port.postMessage(msg);
     }
 
     process(_inputs, outputs) {
@@ -45,7 +58,7 @@ class TrigdeckProcessor extends AudioWorkletProcessor {
         const lr = new Float32Array(this.x.memory.buffer, p, n * 2);
         const L = out[0], R = out[1] || out[0];
         for (let i = 0; i < n; i++) { L[i] = lr[2 * i]; R[i] = lr[2 * i + 1]; }
-        if (++this.blocks % 19 === 0) this.sendState();                // (~20 a second at 48 kHz)
+        if (++this.blocks % 12 === 0) this.post(false);                // (~31 a second at 48 kHz)
         return true;
     }
 }

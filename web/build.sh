@@ -8,8 +8,13 @@ CLANG=/opt/homebrew/opt/llvm/bin/clang
 SYSROOT=/opt/homebrew/share/wasi-sysroot
 BUILTINS=$(ls /opt/homebrew/opt/wasi-runtimes/share/wasi-runtimes/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a)
 EXPORTS=""
-for f in td_play td_pattern_queue td_step_toggle td_set_tempo td_crossfader td_deck_level td_mute td_fill \
-         td_perf td_pack_load td_pack_count td_set_length_repeat td_trigger td_release td_project_new; do
+# every engine call the app's actions use (as Sources/DDJGroovebox/TrigEngine.swift applies them)
+for f in td_play td_restart td_record td_tap_tempo td_fill td_set_tempo td_set_swing td_nudge \
+         td_step_set td_step_toggle td_step_lock td_step_micro td_step_cond td_step_slide td_step_accent \
+         td_param_set td_global_set td_set_machine td_set_sample td_trigger td_release td_mute \
+         td_pattern_queue td_pattern_copy td_scene_set td_scene_clear td_crossfader td_deck_level td_deck_drive \
+         td_scratch td_perf td_capture td_euclid td_rotate td_dice td_autopilot \
+         td_pack_load td_pack_revert td_pack_count td_set_length_repeat td_project_new td_midi_config; do
     EXPORTS="$EXPORTS -Wl,--export=$f"
 done
 PATH="/opt/homebrew/opt/lld/bin:$PATH" "$CLANG" --target=wasm32-wasip1 --sysroot="$SYSROOT" \

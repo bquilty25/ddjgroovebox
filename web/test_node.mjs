@@ -2,11 +2,10 @@
 // The WebAssembly engine, checked in Node: it starts, plays P01 and P13 (their own tempos), at a sane level, and a
 // step toggled from outside is heard. Usage: node web/test_node.mjs
 import { readFileSync } from "node:fs";
+import { instantiate } from "./src/wasi.js";
 
 const bytes = readFileSync(new URL("./trigcore.wasm", import.meta.url));
-const { instance } = await WebAssembly.instantiate(bytes, {});
-const x = instance.exports;
-x._initialize();
+const x = instantiate(bytes);
 let fails = 0;
 const check = (msg, ok) => { console.log(`  ${msg.padEnd(70)} ${ok ? "ok" : "FAIL"}`); if (!ok) fails++; };
 

@@ -7,8 +7,8 @@ what it does right now and shows its value: you never have to translate between 
 
 1. Press the left deck's **PLAY**: deck A's pattern, the deep house TRIGDECK opens with, starts (deck B waits with
    techno; see *Two decks* below).
-2. Touch the **left jog's top** and move it: you are scratching deck A (kick, open hat, clap, closed hats) while the pattern runs
-   on underneath. Let go: it drops back in time.
+2. Touch the **left jog's top** and move it: you are scratching deck A like a record. Drag back and the pattern goes
+   back (the playhead follows your hand); hold it still and the pattern stops. Let go: it carries on from there.
 3. Move the **crossfader** left and right: the pattern morphs into scene A and scene B. The middle is the pattern as
    written.
 4. Hold **SHIFT** and press the **left BEAT SYNC** (FILL): AUTOPILOT arranges the pattern in 8-bar phrases (kick drops,
@@ -106,7 +106,7 @@ kit the load replaced (again: back to the pack).
 | PLAY | starts / stops its own deck; on the waiting deck while the other plays: BLEND (it starts on the next bar and the Smart Fader takes over); SHIFT: back to the start |
 | CUE | left: record live (pads in KEYS mode are recorded); right: tap tempo (SHIFT + TAP: back to the tempo from before the taps) |
 | Left BEAT SYNC | FILL while held; SHIFT: AUTOPILOT |
-| Jog, top touched | scratch the deck (slip); SHIFT + touch: resample the deck's last bar into a sample |
+| Jog, top touched | scratch the deck like a record: the pattern follows the platter (back, held still) and carries on from there when you let go, to the nearest step; SHIFT + touch: resample the deck's last bar into a sample |
 | Jog, side | a dial around the deck's ring of four tracks (left jog: tracks 1-4, right jog: 5-8): the marker on the drawn jog turns with the platter, a quarter turn a track, and the quadrant it points into is the active track. Turning the other deck's jog a little brings the active track to that deck. With a step held: its micro timing; with a track's pad held: rotate it; SHIFT: nudge the tempo |
 | TEMPO sliders | left: tempo, right: swing; towards you (down, the "+" end) = faster / more, on screen as on the hardware (they take over once moved past the current value) |
 | Channel faders, TRIM | deck A / deck B level and drive |

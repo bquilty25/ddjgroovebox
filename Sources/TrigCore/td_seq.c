@@ -309,6 +309,11 @@ static void decide_step(int64_t k)
 {
     for (int d = 0; d < TD_DECKS; d++) decide_deck(d, k);
 }
+/* a deck moved (a scratch let go: its origin changed): the steps already decided ahead, decided again from there */
+void td_seq_redecide_deck(int d)
+{
+    for (int64_t k = (int64_t)ceil(E.gpos); k < E.kdec; k++) decide_deck(d, k);
+}
 
 /* the frame of this block an event falls on: the first frame at or after its time (a large number: a later block) */
 static int ev_off(double t, double g0, double rate)

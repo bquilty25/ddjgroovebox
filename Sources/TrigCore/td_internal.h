@@ -507,6 +507,7 @@ void td_seq_apply(const td_event_t *ev, int64_t frame);
 void td_seq_reset_transport(void);
 void td_seq_stop_notes(void);
 void td_seq_stop_deck(int deck);                               /* (DJ decks) one deck's notes and events */
+void td_seq_redecide_deck(int deck);                           /* (DJ decks) its steps decided ahead, again */
 void td_track_eff(int t);                                      /* compute trk[t].eff from base, locks, scenes, LFO, autopilot */
 void td_lfo_advance(int t, int n, double rate);
 void td_note_on(int t, int note, float vel, int32_t gate, int flags);

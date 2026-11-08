@@ -1323,6 +1323,18 @@ void td_scratch(int deck, int touching, float rate)
             k->rate_s = 1.f;
             k->sgain = 1.f;
         }
+        if (!touching && k->touching && E.playing && E.dk[deck].playing) {
+            /* let go: like a record (no slip), the deck's pattern carries on from where the platter is: as many steps
+             * back as the sound under the hand is behind (dragged back, or held still), to the nearest step */
+            int64_t n = llround(((double)k->wabs - k->head) / td_frames_per_step());
+            if (n > 0) {
+                td_dk_t *dk = &E.dk[deck];
+                dk->origin += n;
+                dk->dec_origin += n;
+                td_seq_stop_deck(deck);                        /* (what was decided from the old place: dropped, */
+                td_seq_redecide_deck(deck);                    /*  decided again from the new one) */
+            }
+        }
         k->touching = touching != 0;
         if (rate == rate) k->rate_t = clampf(rate, -4.f, 4.f);
     }
@@ -1397,7 +1409,9 @@ void td_get_state(td_state_t *s)
             s->deck_pattern[d] = dk->pat;
             s->deck_queued[d] = dk->queued;
             s->deck_playing[d] = E.playing && dk->playing;
-            int64_t kp = (int64_t)floor(E.gpos - (double)dk->origin);
+            double behind = 0.0;                                /* (scratching: the platter's place, behind the clock) */
+            if (E.deck[d].touching) behind = ((double)E.deck[d].wabs - E.deck[d].head) / td_frames_per_step();
+            int64_t kp = (int64_t)floor(E.gpos - (double)dk->origin - behind);
             for (int t = 0; t < TD_TRACKS; t++) {
                 int len = P->length[t] ? P->length[t] : 16, rt = d * TD_TRACKS + t;
                 s->deck_step[d][t] = s->deck_playing[d] && kp >= 0 ? (int32_t)(kp % len) : -1;

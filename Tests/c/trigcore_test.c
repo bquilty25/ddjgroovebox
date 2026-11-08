@@ -326,6 +326,29 @@ TEST(test_decks)
     check("the last deck stopped: the clock stops", !st.playing);
 }
 
+/* (DJ decks) scratching like a record: the playhead follows the platter, and on release the pattern carries on from
+ * where the platter is (to the nearest step) */
+TEST(test_scratch_rewind)
+{
+    setup_empty(120);                                          /* 6000 frames a step */
+    for (int s = 0; s < 16; s++) td_step_note(0, s, 40 + s, 100);   /* track 1: note 40 + its step */
+    td_play(1);
+    render_frames(6000 * 8 + 3000, 100);                       /* half way through step 8 */
+    td_scratch(0, 1, 0.f);                                     /* the platter held still ... */
+    render_frames(6000 * 4, 100);                              /* ... for 4 steps */
+    td_state_t st;
+    td_get_state(&st);
+    char msg[120];
+    snprintf(msg, sizeof msg, "held: the playhead stays where the platter is (step %d, 8)", st.deck_step[0][0]);
+    check(msg, st.deck_step[0][0] == 8);
+    int before = nnotes;
+    td_scratch(0, 0, 0.f);
+    render_frames(6000 * 2, 100);
+    int first = before < nnotes ? notes[before].note : -1;
+    snprintf(msg, sizeof msg, "let go: the pattern carries on from there (the next note %d: step 9's, 49; not step 13's)", first);
+    check(msg, first == 49);
+}
+
 static float rms_of(int frames)                                /* renders, returns the RMS */
 {
     static float b[2 * 4800];
@@ -1443,6 +1466,7 @@ int main(void)
     RUN(test_pattern_queue);
     RUN(test_decks);
     RUN(test_blend);
+    RUN(test_scratch_rewind);
     RUN(test_scenes);
     RUN(test_scratch);
     RUN(test_perf);

@@ -60,7 +60,7 @@ gestures DJs already have in their hands.
 | Channel faders, TRIM | deck A and deck B bus level and drive |
 | Crossfader | scene A ← pattern → scene B |
 | Headphone CUE (held) | edit scene A / B: knobs turned while held go into the scene (SHIFT: clear it) |
-| Beat FX: FX SELECT, BEAT ◀ ▶, channel switch, LEVEL/DEPTH, ON/OFF | performance effect, division, target (deck A, deck B, master), amount, hold to play |
+| Beat FX: FX SELECT, BEAT ◀ ▶, channel switch, LEVEL/DEPTH, ON/OFF | performance effect, division, target (deck A, deck B, master), amount, on / off (a toggle) |
 
 ## Learned from the FM-1 community
 

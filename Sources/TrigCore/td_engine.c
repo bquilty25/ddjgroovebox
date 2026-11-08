@@ -703,6 +703,21 @@ int td_init(void)
     return 0;
 }
 
+void td_project_new(void)
+{
+    td_play(0);
+    td_lock();
+    if (E.inited) {
+        for (int t = 0; t < TD_TRACKS; t++)
+            for (int i = 0; i < TD_VOICES; i++) td_voice_fade(&E.trk[t].v[i], 5.f);
+        td_default_project();
+        memset(E.muted, 0, sizeof E.muted);
+        E.queued = -1;
+        E.dec_pat = E.cur;
+    }
+    td_unlock();
+}
+
 void td_render(float *buf, uint32_t frames, uint64_t host_time)
 {
     if (!buf || !frames)

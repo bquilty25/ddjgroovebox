@@ -82,6 +82,9 @@ const char *td_perf_name(int perf);                      /* "REPEAT" ... */
  * engines, on a fixed voice map (1 kick, 2 open hat, 3 snare / clap, 4 closed hat, 5 bass, 6 keys / chords, 7 perc /
  * lead, 8 sample or extra). Loading copies the kit into the current pattern and keeps its steps; revert puts back the
  * kit the last load replaced. */
+/* (added) a new project: stops, then the default patterns, tempos, sounds and MASTER page (the samples stay) */
+void td_project_new(void);
+
 int td_pack_count(void);
 const char *td_pack_name(int pack);                      /* "808" ... */
 void td_pack_load(int pack);

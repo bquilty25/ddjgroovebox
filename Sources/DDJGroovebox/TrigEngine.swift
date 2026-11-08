@@ -201,6 +201,25 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
 
     // MARK: the project file
 
+    /// A new project (the default patterns): the current one is first kept beside it, named by the date and time.
+    /// Returns the backup's URL (nil if there was nothing to keep).
+    @discardableResult
+    func newProject() -> URL? {
+        saveIfDirty(force: true)
+        var backup: URL?
+        if FileManager.default.fileExists(atPath: projectURL.path) {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd HHmmss"
+            let url = projectURL.deletingLastPathComponent()
+                .appendingPathComponent("trigdeck \(f.string(from: Date())).project")
+            if (try? FileManager.default.copyItem(at: projectURL, to: url)) != nil { backup = url }
+        }
+        td_project_new()
+        infoCache = [:]
+        saveIfDirty(force: true)
+        return backup
+    }
+
     func saveIfDirty(force: Bool = false) {
         guard dirty || force, force || Date().timeIntervalSince(lastSave) > 5 else { return }
         lastSave = Date()

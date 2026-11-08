@@ -623,6 +623,18 @@ TEST(test_project)
     td_get_state(&st);
     check("tempo, parameters, steps and mutes restored", fabsf(st.bpm - 122.f) < 0.05f && td_param_get(3, P_CUT) != 11 && !st.muted[5]);
     check("the patterns' own tempos too (version 2)", E.pat[12].bpm10 == 1740 && E.pat[0].bpm10 == 1220);
+    /* a new project: an emptied, muted, slower one becomes the default patterns again */
+    td_pattern_clear(9);
+    td_mute(2, 1);
+    td_set_tempo(90);
+    td_play(1);
+    td_render_offline(4800);
+    td_project_new();
+    td_get_state(&st);
+    int filled = 0;
+    for (int s = 0; s < 16; s++) filled += E.pat[9].step[0][s].trig;
+    check("New Project: stopped, the default patterns, tempos and mutes back",
+          !st.playing && st.pattern == 0 && fabsf(st.bpm - 122.f) < 0.01f && filled >= 4 && !st.muted[2]);
     td_set_tempo(99);
     int nc = td_project_save(c, n);
     memcpy(b, c, (size_t)nc);

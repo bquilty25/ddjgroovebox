@@ -78,7 +78,8 @@ Yes, every few seconds after a change and when you quit: TRIGDECK in `trigdeck.p
 `.damaged`, never overwritten.
 
 **How do I start again?**
-Quit and delete `trigdeck.project`: TRIGDECK opens on its default patterns again.
+Groovebox > New Project (Cmd-N): TRIGDECK loads its 16 default patterns. Your project is kept first, as a dated copy
+in the same folder (Groovebox > Show TRIGDECK Project in Finder).
 
 ## MIDI and other software
 

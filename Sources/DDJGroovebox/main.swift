@@ -67,6 +67,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func panic(_ sender: Any?) { controller?.panic() }
 
+    /// TRIGDECK's default patterns, the current project kept beside it first
+    @objc func newProject(_ sender: Any?) {
+        guard let t = trigdeck else { return }
+        let alert = NSAlert()
+        alert.messageText = "Start a new project?"
+        alert.informativeText = "TRIGDECK loads its 16 default patterns (house, techno, garage, drum & bass) and their "
+            + "sounds. Your current project is kept as a dated copy in the same folder (Groovebox > Show TRIGDECK Project in Finder)."
+        alert.addButton(withTitle: "New Project")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        t.engine.apply(t.mapper.releaseAll())
+        t.engine.newProject()
+        if controller?.instrument !== t { playTrigdeck(nil) }
+    }
+
+    @objc func revealProject(_ sender: Any?) {
+        guard let t = trigdeck else { return }
+        t.engine.saveIfDirty(force: true)
+        NSWorkspace.shared.activateFileViewerSelecting([t.engine.projectURL])
+    }
+
     @objc func revealFlash(_ sender: Any?) {
         guard let gb = controller?.groovebox else { return }
         gb.save()
@@ -114,8 +135,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inst.addItem(withTitle: "SLOOP 2.8.5 by isod89", action: #selector(playSloop(_:)), keyEquivalent: "2").target = self
 
         let gb = submenu("Groovebox")
+        gb.addItem(withTitle: "New Project (the Default Patterns)…", action: #selector(newProject(_:)), keyEquivalent: "n").target = self
         gb.addItem(withTitle: "Panic (all notes off, stop)", action: #selector(panic(_:)), keyEquivalent: ".").target = self
-        gb.addItem(withTitle: "Show Saved Data in Finder", action: #selector(revealFlash(_:)), keyEquivalent: "").target = self
+        gb.addItem(.separator())
+        gb.addItem(withTitle: "Show TRIGDECK Project in Finder", action: #selector(revealProject(_:)), keyEquivalent: "").target = self
+        gb.addItem(withTitle: "Show SLOOP Data in Finder", action: #selector(revealFlash(_:)), keyEquivalent: "").target = self
 
         let view = submenu("View")
         let fs = view.addItem(withTitle: "Enter Full Screen", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")

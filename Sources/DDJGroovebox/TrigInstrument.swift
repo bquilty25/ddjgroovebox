@@ -184,8 +184,8 @@ final class TrigStripView: NSView, TopStrip {
         center = c
     }
 
-    private var mixerX: CGFloat { (bounds.width * 460 / 1240).rounded() }
-    private var rightX: CGFloat { (bounds.width * 780 / 1240).rounded() }
+    private var mixerX: CGFloat { (bounds.width * DDJ400View.columnFractions.mixerStart).rounded() }
+    private var rightX: CGFloat { (bounds.width * DDJ400View.columnFractions.rightStart).rounded() }
     private func rowRect(_ t: Int) -> CGRect {
         let rowH = (bounds.height - 16) / 4
         let x0: CGFloat = t < 4 ? 8 : rightX + 8
@@ -197,7 +197,8 @@ final class TrigStripView: NSView, TopStrip {
     override func draw(_ dirtyRect: NSRect) {
         guard let g = NSGraphicsContext.current?.cgContext else { return }
         let W = bounds.width, H = bounds.height
-        let mx = (W * 460 / 1240).rounded(), rx = (W * 780 / 1240).rounded()
+        let mx = mixerX, rx = rightX
+        _ = W
         g.setFillColor(SloopStyle.bg.cgColor); g.fill(bounds)
         // the three columns, open at the bottom: the controller continues below
         g.setFillColor(SloopStyle.s1.cgColor)

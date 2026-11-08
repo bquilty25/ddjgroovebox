@@ -268,6 +268,20 @@ extension DDJ400View {
     // MARK: - Draw
 
     /// the static parts (panels, printed labels, scales): drawn by the backdrop layer, again only when the size changes
+    /// an analogue knob (no MIDI: drawn, never played), dim
+    private func printedKnob(_ g: CGContext, _ c: CGPoint, _ r: CGFloat) {
+        g.setStrokeColor(SloopStyle.line.cgColor)
+        g.setFillColor(SloopStyle.s2.cgColor)
+        g.setLineWidth(1)
+        let rect = CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)
+        g.fillEllipse(in: rect)
+        g.strokeEllipse(in: rect)
+        g.setStrokeColor(SloopStyle.dim.cgColor)
+        g.setLineWidth(2)
+        g.move(to: CGPoint(x: c.x, y: c.y - r * 0.2)); g.addLine(to: CGPoint(x: c.x, y: c.y - r * 0.85))
+        g.strokePath()
+    }
+
     func drawBackdrop(_ dirtyRect: NSRect) {
         guard let g = NSGraphicsContext.current?.cgContext else { return }
         let deviceScale = max(1, hypot(g.ctm.a, g.ctm.b))
@@ -358,14 +372,41 @@ extension DDJ400View {
         let lw = CGFloat(legend.count) * charWidth(lblSize) + 8
         g.setFillColor(SloopStyle.s1.cgColor)
         g.fill(CGRect(x: fx.minX + 6, y: fx.minY - 6, width: lw, height: 12))
-        drawLabel(legend, x: fx.minX + 10, y: fx.minY, align: .left, color: SloopStyle.fg2)
-        drawLabel("BEAT", x: 526, y: 222)
+        drawLabel(legend, x: fx.minX + 6, y: fx.minY, align: .left, color: SloopStyle.fg2)
+        drawLabel("BEAT", x: Self.rightColMid, y: 282)
+
+        // the mixer's column lines (as printed on the DDJ-400), from under the LOAD row to the channel faders' foot
+        g.setStrokeColor(SloopStyle.line.cgColor)
+        g.setLineWidth(px)
+        for x in [Self.leftColX, Self.rightColX] {
+            g.move(to: CGPoint(x: x, y: 116)); g.addLine(to: CGPoint(x: x, y: 640))
+        }
+        g.strokePath()
+
+        // left column: the name, HEADPHONES (MIXING is a control; LEVEL is analogue, printed only)
+        let lx = Self.leftColMid
+        drawLabel("PERFORMANCE", x: lx, y: 134, color: SloopStyle.fg2)
+        drawText("DDJ-400", size: 14, SloopStyle.fg2, x: lx, y: 154)
+        drawLabel("HEADPHONES", x: lx, y: 312, color: SloopStyle.fg2)
+        drawLabel("LEVEL", x: lx, y: 432)
+        printedKnob(g, CGPoint(x: lx, y: 456), 12)
+
+        // right column: MASTER (analogue, printed only), then BEAT FX
+        let rx = Self.rightColMid
+        drawLabel("MASTER", x: rx, y: 132, color: SloopStyle.fg2)
+        drawLabel("LEVEL", x: rx, y: 148)
+        printedKnob(g, CGPoint(x: rx, y: 170), 12)
+        g.setStrokeColor(SloopStyle.track[2].withAlphaComponent(0.6).cgColor)
+        g.setLineWidth(1.5)
+        let cue = CGRect(x: rx - 18, y: 190, width: 36, height: 14)
+        g.stroke(cue)
+        drawLabel("CUE", x: rx, y: cue.midY, color: SloopStyle.fg2)
 
         // fader scale between the channel faders
         if let i = itemIndex(for: .channelFader(.left)) {
             let r = items[i].rect
             for v in stride(from: 0, through: 10, by: 2) {
-                drawLabel("\(v)", x: 620, y: r.minY + r.height * CGFloat(10 - v) / 10)
+                drawLabel("\(v)", x: Self.mixerMid, y: r.minY + r.height * CGFloat(10 - v) / 10)
             }
         }
 
@@ -1076,7 +1117,7 @@ extension DDJ400View {
         let segs = Self.meterSegmentCount, gap: CGFloat = 3
         let segH = (h - CGFloat(segs - 1) * gap) / CGFloat(segs)
         let levels = [meters.0, meters.1]
-        for (k, x) in [CGFloat(612), CGFloat(621)].enumerated() {
+        for (k, x) in [r.minX + 2, r.minX + 11].enumerated() {
             let lit = Self.segments(levels[k])
             for i in 0..<segs {
                 let y = top + h - CGFloat(i + 1) * segH - CGFloat(i) * gap

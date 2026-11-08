@@ -210,14 +210,14 @@ public struct DeckTrackFace: Equatable {
 
     /// Where the columns start, as fractions of the width: left deck 0, mixer, right deck. The body is open at the
     /// top so a view above with the same columns (s1 fill, 1 pt `line` borders) joins it.
-    public nonisolated static let columnFractions: (mixerStart: CGFloat, rightStart: CGFloat) = (460.0 / 1240.0, 780.0 / 1240.0)
+    public nonisolated static let columnFractions: (mixerStart: CGFloat, rightStart: CGFloat) = (mixerX / designW, rightDeckX / designW)
 
     // MARK: - Invalidation: only what changed is redrawn (meters, playhead and levels change many times a second)
 
     nonisolated static let meterSegmentCount = 15
-    nonisolated static let meterRect = CGRect(x: 606, y: 262, width: 28, height: 250)
+    nonisolated static let meterRect = CGRect(x: mixerMid - 10, y: 222, width: 20, height: 178)
     /// the header (or status line) at the top of the mixer
-    nonisolated static let statusRect = CGRect(x: 462, y: 0, width: 316, height: 46)
+    nonisolated static let statusRect = CGRect(x: mixerX + 2, y: 0, width: rightDeckX - mixerX - 4, height: 46)
 
     nonisolated static func segments(_ v: Double) -> Int {
         Int((clamp(v) * Double(meterSegmentCount)).rounded(.toNearestOrAwayFromZero))
@@ -368,13 +368,19 @@ public struct DeckTrackFace: Equatable {
         updateAccessibilityFrames()
     }
 
-    // MARK: - Layout (design space 1240 x 700, y down; decks 460 wide, mixer 320)
+    // MARK: - Layout (design space 1240 x 700, y down: the DDJ-400's 482 x 272 mm; decks 440 wide, mixer 360)
 
     nonisolated static let designW: CGFloat = 1240
     nonisolated static let designH: CGFloat = 700
-    nonisolated static let mixerX: CGFloat = 460
-    nonisolated static let rightDeckX: CGFloat = 780
-    nonisolated static let beatFXBox = CGRect(x: 466, y: 156, width: 308, height: 106)
+    nonisolated static let mixerX: CGFloat = 440
+    nonisolated static let rightDeckX: CGFloat = 800
+    /// the mixer's columns: left (the name, HEADPHONES) 440-500, middle (the channels) 500-710, right (MASTER, BEAT FX)
+    nonisolated static let leftColX: CGFloat = 500
+    nonisolated static let rightColX: CGFloat = 710
+    nonisolated static let mixerMid: CGFloat = (leftColX + rightColX) / 2
+    nonisolated static let leftColMid: CGFloat = (mixerX + leftColX) / 2
+    nonisolated static let rightColMid: CGFloat = (rightColX + rightDeckX) / 2
+    nonisolated static let beatFXBox = CGRect(x: rightColX + 4, y: 222, width: rightDeckX - rightColX - 8, height: 350)
 
     struct Item: Sendable {
         enum Kind: Sendable {
@@ -462,11 +468,11 @@ public struct DeckTrackFace: Equatable {
             add(.reloop(deck), .round, circle(x0 + 154, 72, 14), "RELOOP/EXIT", .below, .at(CGPoint(x: x0 + 154, y: capY), width: 50), value: .inside)
             add(.callLeft(deck), .button, centered(x0 + 212, 72, 26, 24), "\u{25C0}", .inside, .at(CGPoint(x: x0 + 212, y: capY), width: 58))
             add(.callRight(deck), .button, centered(x0 + 274, 72, 26, 24), "\u{25B6}", .inside, .at(CGPoint(x: x0 + 274, y: capY), width: 58))
-            add(.sync(deck), .round, circle(x0 + 410, 72, 19), "BEAT SYNC", .below, .at(CGPoint(x: x0 + 410, y: capY), width: 90), value: .inside)
+            add(.sync(deck), .round, circle(x0 + 398, 72, 19), "BEAT SYNC", .below, .at(CGPoint(x: x0 + 398, y: capY), width: 80), value: .inside)
             // jog and tempo
             add(.jog(deck), .jog, circle(x0 + 200, 258, 128), "JOG", .none, .inside, value: .inside)
-            add(.tempo(deck), .vfader, CGRect(x: x0 + 402, y: 288, width: 32, height: 330), "TEMPO", .below,
-                .at(CGPoint(x: x0 + 418, y: 250), width: 84))
+            add(.tempo(deck), .vfader, CGRect(x: x0 + 395, y: 288, width: 28, height: 330), "TEMPO", .below,
+                .at(CGPoint(x: x0 + 409, y: 250), width: 62))
             // transport column
             add(.shift(deck), .shiftButton, centered(x0 + 46, 452, 52, 22), "SHIFT", .inside, .above(width: 84))
             add(.cue(deck), .round, circle(x0 + 46, 530, 30), "CUE", .inside, .above(width: 86))
@@ -484,42 +490,47 @@ public struct DeckTrackFace: Equatable {
             }
         }
 
-        // mixer top (under the header): BROWSE between the LOAD buttons
-        add(.browse, .browse, circle(620, 92, 20), "BROWSE", .below, .at(CGPoint(x: 620, y: 58), width: 100))
-        add(.load(.left), .button, centered(512, 90, 52, 22), "LOAD", .inside, .at(CGPoint(x: 512, y: 58), width: 90))
-        add(.load(.right), .button, centered(728, 90, 52, 22), "LOAD", .inside, .at(CGPoint(x: 728, y: 58), width: 90))
+        // the mixer, as on the DDJ-400: three columns. Left: the name and HEADPHONES; middle: the two channel strips
+        // (the meter between them), the channel faders and the crossfader; right: MASTER and BEAT FX. BROWSE and the
+        // LOAD buttons sit above the channel strips.
+        let mid = mixerMid, chL = mixerMid - 50, chR = mixerMid + 50
+        add(.load(.left), .button, centered(chL - 10, 80, 46, 22), "LOAD", .inside, .at(CGPoint(x: chL - 10, y: 56), width: 70))
+        add(.browse, .browse, circle(mid, 80, 18), "BROWSE", .below, .at(CGPoint(x: mid, y: 56), width: 70))
+        add(.load(.right), .button, centered(chR + 10, 80, 46, 22), "LOAD", .inside, .at(CGPoint(x: chR + 10, y: 56), width: 70))
 
-        // beat FX: a row of controls, then the channel switch
-        let fxY: CGFloat = 198, fxCapY: CGFloat = 174
-        add(.beatLeft, .button, centered(496, fxY, 32, 22), "\u{25C0}", .inside, .at(CGPoint(x: 496, y: fxCapY), width: 56))
-        add(.beatRight, .button, centered(556, fxY, 32, 22), "\u{25B6}", .inside, .at(CGPoint(x: 556, y: fxCapY), width: 56))
-        add(.fxSelect, .button, centered(620, fxY, 58, 22), "FX SELECT", .inside, .at(CGPoint(x: 620, y: fxCapY), width: 58))
-        add(.fxLevel, .knob, circle(682, fxY, 14), "LEVEL/DEPTH", .below, .at(CGPoint(x: 682, y: fxCapY), width: 54))
-        add(.fxOnOff, .round, circle(748, fxY, 16), "ON/OFF", .below, .at(CGPoint(x: 748, y: fxCapY), width: 50), value: .inside)
-        for n in 0..<3 {
-            add(.fxChannel(n), .segment, CGRect(x: 513 + CGFloat(n) * 72, y: 240, width: 70, height: 16),
-                ["CH 1", "CH 2", "MASTER"][n], .inside, .inside, value: .inside)
-        }
-
-        // channel strips: knobs with their block (title, value, DDJ label) on the outer side, the meter between them
+        // channel strips: a title above each knob, its value under it
         for deck in Deck.allCases {
             let left = deck == .left
-            let x: CGFloat = left ? 586 : 654
+            let x = left ? chL : chR
             let n = left ? "1" : "2"
             let knobs: [(DDJControl, String, CGFloat)] = [
-                (.trim(deck), "TRIM", 286), (.eqHi(deck), "HI", 336), (.eqMid(deck), "MID", 386),
-                (.eqLow(deck), "LOW", 436), (.cfx(deck), "FILTER", 486),
+                (.trim(deck), "TRIM", 166), (.eqHi(deck), "HI", 238), (.eqMid(deck), "MID", 310),
+                (.eqLow(deck), "LOW", 382), (.cfx(deck), "FILTER", 454),
             ]
             for (c, label, y) in knobs {
-                add(c, .knob, circle(x, y, 14), label, .none, .side(left: left, width: 94))
+                add(c, .knob, circle(x, y, 14), label, .below, .above(width: 92))
             }
-            add(.headphoneCue(deck), .button, centered(x, 528, 42, 22), "CUE " + n, .inside, .side(left: left, width: 89))
-            add(.channelFader(deck), .vfader, CGRect(x: x - 15, y: 562, width: 30, height: 66), "CH " + n, .none,
-                .side(left: left, width: 92))
+            add(.headphoneCue(deck), .button, centered(x, 524, 42, 20), "CUE", .inside, .above(width: 92))
+            add(.channelFader(deck), .vfader, CGRect(x: x - 14, y: 562, width: 28, height: 86), n, .none,
+                .at(CGPoint(x: x, y: 549), width: 92), value: .inline)
         }
-        add(.crossfader, .hfader, CGRect(x: 568, y: 664, width: 104, height: 22), "CROSSFADER", .left,
-            .at(CGPoint(x: 620, y: 647), width: 220))
-        add(.headphoneLevel, .knob, circle(700, 675, 12), "PHONES", .none, .side(left: false, width: 50))
+        add(.crossfader, .hfader, CGRect(x: mid - 56, y: 676, width: 112, height: 18), "CROSSFADER", .none,
+            .at(CGPoint(x: mid, y: 662), width: 200))
+
+        // left column: HEADPHONES MIXING (the LEVEL beside it is analogue: printed only)
+        add(.headphoneLevel, .knob, circle(leftColMid, 360, 13), "MIXING", .below, .above(width: 58))
+
+        // right column: BEAT FX (MASTER above it is analogue: printed only)
+        let rx = rightColMid
+        add(.beatLeft, .button, centered(rx - 21, 262, 36, 20), "\u{25C0}", .inside, .above(width: 44))
+        add(.beatRight, .button, centered(rx + 21, 262, 36, 20), "\u{25B6}", .inside, .above(width: 44))
+        add(.fxSelect, .button, centered(rx, 330, 70, 20), "FX SELECT", .inside, .above(width: 86))
+        for n in 0..<3 {
+            add(.fxChannel(n), .segment, CGRect(x: rx - 38, y: 358 + CGFloat(n) * 18, width: 76, height: 16),
+                ["CH 1", "CH 2", "MASTER"][n], .inside, .inside, value: .inside)
+        }
+        add(.fxLevel, .knob, circle(rx, 452, 14), "LEVEL/DEPTH", .below, .above(width: 86))
+        add(.fxOnOff, .round, circle(rx, 530, 18), "ON/OFF", .below, .above(width: 86), value: .inside)
         return out
     }
 

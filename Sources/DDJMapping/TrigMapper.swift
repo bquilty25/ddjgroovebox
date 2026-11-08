@@ -462,8 +462,8 @@ public final class TrigMapper {
             return ControlFace(title: s == 0 ? "SCENE A" : "SCENE B", color: s == 0 ? TrigColors.sceneA : TrigColors.sceneB,
                                light: sceneEdit == s ? .on : .off)
         case .fxSelect: return ControlFace(title: "FX", value: PerfFX(rawValue: perfType)?.name)
-        case .beatLeft: return ControlFace(title: "DIV -", value: Self.divisions[perfDivision])
-        case .beatRight: return ControlFace(title: "DIV +", value: Self.divisions[perfDivision])
+        case .beatLeft: return ControlFace(title: "DIV-", value: Self.divisions[perfDivision])
+        case .beatRight: return ControlFace(title: "DIV+", value: Self.divisions[perfDivision])
         case .fxOnOff: return ControlFace(title: PerfFX(rawValue: perfType)?.name ?? "FX", color: 0xFF2E7CFF,
                                           light: perfOn ? .on : .off)
         case .fxLevel: return ControlFace(title: "AMOUNT", value: "\(Int(perfAmount * 100))%", arc: perfAmount)

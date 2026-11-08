@@ -8,7 +8,8 @@ and Edge on macOS, Windows, Linux and ChromeOS (Safari has no Web MIDI; Firefox 
 
     brew install llvm lld wasi-libc wasi-runtimes   # once: the WebAssembly toolchain
     sh web/build.sh                                  # web/trigcore.wasm (~120 KB)
-    sh web/serve.sh                                  # then open http://localhost:8000/web/ in Chrome or Edge
+    sh web/serve.sh                                  # then open http://localhost:8642/web/ in Chrome or Edge
+                                                     # (another port: PORT=9000 sh web/serve.sh)
 
 Press START (browsers start audio only after a click). Allow MIDI (with SysEx) when asked.
 

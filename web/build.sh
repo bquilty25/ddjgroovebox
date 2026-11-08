@@ -14,7 +14,8 @@ for f in td_play td_restart td_record td_tap_tempo td_fill td_set_tempo td_set_s
          td_param_set td_global_set td_set_machine td_set_sample td_trigger td_release td_mute \
          td_pattern_queue td_pattern_copy td_scene_set td_scene_clear td_crossfader td_deck_level td_deck_drive \
          td_scratch td_perf td_capture td_euclid td_rotate td_dice td_autopilot \
-         td_pack_load td_pack_revert td_pack_count td_set_length_repeat td_project_new td_midi_config; do
+         td_pack_load td_pack_revert td_pack_count td_set_length_repeat td_project_new td_midi_config \
+         td_deck_play td_deck_pattern td_focus td_on_air td_blend_fader td_deck_eq td_deck_filter; do
     EXPORTS="$EXPORTS -Wl,--export=$f"
 done
 PATH="/opt/homebrew/opt/lld/bin:$PATH" "$CLANG" --target=wasm32-wasip1 --sysroot="$SYSROOT" \

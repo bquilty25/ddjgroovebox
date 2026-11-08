@@ -64,7 +64,7 @@ static void apply_scene(int t, float *eff, float x)
     td_pattern_t *P = RT_PAT(t);
     int pt = RT_TR(t), sc;
     float amt;
-    if (RT_DECK(t) != E.on_air) return;                        /* (the crossfader's scenes: the deck on air's) */
+    if (RT_DECK(t) != E.on_air || E.blending) return;          /* (the scenes: the deck on air's; not in a blend) */
     if (x < 0.4999f) { sc = 0; amt = (0.5f - x) * 2.f; }
     else if (x > 0.5001f) { sc = 1; amt = (x - 0.5f) * 2.f; }
     else return;

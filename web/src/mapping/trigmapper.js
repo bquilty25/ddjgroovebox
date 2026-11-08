@@ -69,6 +69,13 @@ export class TrigMapper {
     #nudgeLast = null;
     #tempoPicked = false;
     #crossfaderLast = null;        // (the crossfader passes the middle once before it moves the scenes)
+    // (DJ decks) the crossfader's position; where it was when a blend began; the EQ knobs taken over in the blend
+    #crossfaderPos = 0.5;
+    #blendStart = null;
+    #eqPicked = new Set();
+    #eqLast = new Map();
+    eqPos = new Map();
+    #wasBlending = false;
     #swingPicked = false;
     #lastTempoSet = null;
     #lastSwingSet = null;
@@ -143,7 +150,13 @@ export class TrigMapper {
         const pressed = isPress && down;
         const model = this.model;
         if (kind === "padModeButton" && pressed) { this.#modes[d] = parseControl(c).mode; return []; }
-        if (kind === "play" && pressed) return [{ type: e.shifted ? "restart" : "togglePlay" }];
+        if (kind === "play" && pressed) {
+            // (DJ decks) PLAY starts or stops its own deck; the waiting deck started while the other plays: a blend
+            if (e.shifted) return [{ type: "restart" }];
+            if (model.deckPlaying(d)) return [{ type: "deckPlay", deck: d, on: false }];
+            if (model.deckPlaying(1 - d)) this.#beginBlend();
+            return [{ type: "deckPlay", deck: d, on: true }];
+        }
         if (kind === "cue" && d === 0 && pressed) return [{ type: "toggleRecord" }];
         if (kind === "cue" && d === 1 && pressed) {
             // TAP; SHIFT + TAP: the tempo from before the taps comes back (kept until then, or another pattern)
@@ -163,11 +176,12 @@ export class TrigMapper {
             this.fillHeld = down;
             return [{ type: "fill", on: down }];
         }
-        if (kind === "sync" && d === 1 && pressed) {
+        if (kind === "sync" && d === 1 && pressed && e.shifted) {            // SHIFT + right BEAT SYNC: the MASTER page
             if (this.page === PAGE.master) this.page = this.#pageBeforeMaster;
             else { this.#pageBeforeMaster = this.page; this.page = PAGE.master; }
             return [];
         }
+        if (kind === "sync" && d === 1 && pressed) return [{ type: "focus", deck: 1 - model.focus }];   // (DJ decks)
         if (kind === "loopIn" && pressed) return this.#setPage(d === 0 ? PAGE.trig : PAGE.amp);
         if (kind === "loopOut" && pressed) return this.#setPage(d === 0 ? PAGE.src : PAGE.fx);
         if (kind === "reloop" && pressed) return this.#setPage(d === 0 ? PAGE.fltr : PAGE.lfo);
@@ -198,8 +212,9 @@ export class TrigMapper {
                                    : { type: "stepAccent", track: this.track, step: st, on: !first.accent };
                 });
             }
-            const p = (model.queuedPattern ?? model.pattern) + (d === 0 ? -1 : 1);
-            return [{ type: "queuePattern", pattern: clampInt(0, 15, p) }];
+            // (DJ decks) LOAD: the deck's next pattern (SHIFT: the previous), at once if it is stopped, else at its end
+            const base = model.deckQueued(d) ?? model.deckPattern(d);
+            return [{ type: "deckPattern", deck: d, pattern: (base + (e.shifted ? 15 : 1)) % 16 }];
         }
         if (kind === "browse" && "relative" in v) return this.#browse(v.relative);
         if (kind === "browsePress" && isPress) {
@@ -251,6 +266,8 @@ export class TrigMapper {
             if (kind === "trim") return [{ type: "deckDrive", deck: d, drive: x }];
             if (kind === "channelFader") return [{ type: "deckLevel", deck: d, level: x }];
             if (kind === "crossfader") {
+                this.#crossfaderPos = x;
+                if (model.blending) return [{ type: "blendFader", value: this.blendX(x) }];   // (DJ decks) the Smart Fader
                 // the app starts in the middle (the pattern as written): it takes over once it passes the middle
                 if (!this.crossfaderPicked) {
                     const crossed = this.#crossfaderLast !== null && (this.#crossfaderLast - 0.5) * (x - 0.5) <= 0;
@@ -274,8 +291,58 @@ export class TrigMapper {
         }
         if (kind === "jog" && "relative" in v) return this.#jog(d, v.relative, e.shifted);
         const s = TrigMapper.slot(c);
-        if (s !== null && "absolute" in v) return this.#knob(c, s, v.absolute);
+        if (s !== null && "absolute" in v) return model.blending ? this.#djKnob(c, s, v.absolute) : this.#knob(c, s, v.absolute);
         return [];
+    }
+
+    // (DJ decks) blends
+
+    /** a blend begins (PLAY on the waiting deck): the crossfader counts from here; the EQ knobs start flat */
+    #beginBlend() {
+        this.#wasBlending = true;
+        this.#blendStart = this.#crossfaderPos;
+        this.#eqPicked = new Set();
+        this.#eqLast = new Map();
+        this.eqPos = new Map();
+    }
+    /** the Smart Fader's x from the crossfader: from where it was when the blend began (at least a quarter of its
+     *  travel away) to the new deck's side (B right, A left) */
+    blendX(v) {
+        const target = this.model.blendTo === 1 ? 1 : 0;
+        let p0 = this.#blendStart ?? 0.5;
+        p0 = target === 1 ? Math.min(p0, 0.75) : Math.max(p0, 0.25);
+        return Math.min(1, Math.max(0, (v - p0) / (target - p0)));
+    }
+    /** in a blend the channel's knobs are its deck's DJ EQ (HI, MID, LOW) and FILTER; each starts flat and takes
+     *  over once the knob passes its middle */
+    #djKnob(c, slot, v) {
+        this.#knobLast.set(c, v);                       // (editing resumes from here after the blend)
+        this.#knobAcc.set(c, 0);
+        if (!this.#eqPicked.has(slot)) {
+            const last = this.#eqLast.get(slot);
+            const crossed = last !== undefined && (last - 0.5) * (v - 0.5) <= 0;
+            this.#eqLast.set(slot, v);
+            if (!(Math.abs(v - 0.5) <= 0.06 || crossed)) return [];
+            this.#eqPicked.add(slot);
+        }
+        this.eqPos.set(slot, v);
+        const deck = Math.floor(slot / 4), role = slot % 4;   // (role: 0 HI, 1 MID, 2 LOW, 3 FILTER)
+        if (role === 3) return [{ type: "deckFilter", deck, value: v * 2 - 1 }];
+        return [{ type: "deckEQ", deck, band: 2 - role, value: v }];
+    }
+    /** a knob in a blend: HI / MID / LOW / FILTER of its channel's deck ("FLAT" until it is taken over) */
+    #djKnobFace(slot, color) {
+        const deck = Math.floor(slot / 4), role = slot % 4, v = this.eqPos.get(slot) ?? 0.5;
+        const title = ["HI", "MID", "LOW", "FILTER"][role] + (deck === 0 ? " A" : " B");
+        let value;
+        if (role === 3) value = v < 0.47 ? "LOW-PASS" : (v > 0.53 ? "HIGH-PASS" : "OFF");
+        else {
+            const g = v < 0.5 ? (v * 2) * (v * 2) : 1 + (v - 0.5) * 2;
+            const db = 20 * Math.log10(Math.max(g, 1e-4));
+            value = g < 0.02 ? "KILL" : (Math.abs(db) < 0.5 ? "FLAT" : `${db > 0 ? "+" : ""}${Math.round(db)} dB`);
+        }
+        if (!this.#eqPicked.has(slot)) value += " ·";
+        return face(title, { value, arc: v, color, badge: "DJ" });
     }
 
     /** Time-based releases (call ~60 times a second): a scratched jog that stops moving holds still; a nudge ends. */
@@ -292,6 +359,14 @@ export class TrigMapper {
             this.#nudgeLast = null;
             out.push({ type: "nudge", amount: 0 });
         }
+        if (this.#wasBlending && !this.model.blending) {   // (DJ decks) a blend done: scenes again, through the middle
+            this.crossfaderPicked = false;
+            this.#crossfaderLast = this.#crossfaderPos;
+            this.#blendStart = null;
+            this.#eqPicked = new Set();
+            this.eqPos = new Map();
+        }
+        this.#wasBlending = this.model.blending;
         return out;
     }
 
@@ -669,8 +744,10 @@ export class TrigMapper {
         case "pad": return this.padFace(d, pc.index, this.padMode(d));
         case "padModeButton":
             return face(PAD_FUNCTION_NAME[padFunctionOf(pc.mode)], { light: this.padMode(d) === pc.mode ? ON : OFF });
-        case "play":
-            return face(model.playing ? "STOP" : "PLAY", { color: 0xFF1ECC70, light: model.playing ? ON : OFF });
+        case "play": {                                // (DJ decks) its own deck: STOP, PLAY, or BLEND (the other plays)
+            const on = model.deckPlaying(d);
+            return face(on ? "STOP" : (model.deckPlaying(1 - d) ? "BLEND" : "PLAY"), { color: 0xFF1ECC70, light: on ? ON : OFF });
+        }
         case "cue":
             if (d === 0) return face("REC", { color: 0xFFFF2C34, light: model.recording ? ON : OFF });
         {   // (SHIFT + TAP: back to the tempo before the taps; shown while there is one to go back to)
@@ -682,7 +759,9 @@ export class TrigMapper {
                 return face("FILL", { value: model.autopilot ? "AUTOPILOT" : null,
                                       light: this.fillHeld || model.autopilot ? ON : OFF });
             }
-            return face("MASTER", { color: COLORS.page[6], light: this.page === PAGE.master ? ON : OFF });
+            // (DJ decks) the deck edited; SHIFT: the MASTER page
+            return face(model.focus === 0 ? "EDIT A" : "EDIT B", { value: this.page === PAGE.master ? "MASTER" : null,
+                                                                  color: COLORS.page[6], light: this.page === PAGE.master ? ON : DIM });
         case "loopIn": return this.#pageFace(d === 0 ? PAGE.trig : PAGE.amp);
         case "loopOut": return this.#pageFace(d === 0 ? PAGE.src : PAGE.fx);
         case "reloop": return this.#pageFace(d === 0 ? PAGE.fltr : PAGE.lfo);
@@ -701,7 +780,10 @@ export class TrigMapper {
                 return d === 0 ? face("SLIDE", { light: sv.slide ? ON : OFF })
                                : face("ACCENT", { light: sv.accent ? ON : OFF });
             }
-            return face(d === 0 ? "PAT -" : "PAT +");
+        {   // (DJ decks) the deck's pattern (→ its next)
+            const q = model.deckQueued(d), pad2 = (n) => String(n + 1).padStart(2, "0");
+            return face(d === 0 ? "LOAD A" : "LOAD B", { value: `P${pad2(model.deckPattern(d))}` + (q !== null ? `→${pad2(q)}` : "") });
+        }
         }
         case "browse": {
             const t = this.#firstHeldTrack();
@@ -742,7 +824,12 @@ export class TrigMapper {
         }
         case "trim": return face(d === 0 ? "DRIVE A" : "DRIVE B");
         case "channelFader": return face(d === 0 ? "DECK A" : "DECK B");
-        case "crossfader": return face("SCENE A ◀ AS WRITTEN ▶ SCENE B", { value: this.crossfaderPicked ? null : "MOVE THROUGH THE MIDDLE" });
+        case "crossfader":
+            if (model.blending) {                     // (DJ decks) the Smart Fader
+                return face(`SMART FADER → DECK ${model.blendTo === 0 ? "A" : "B"}`,
+                            { value: `${Math.round(model.blendX * 100)}%`, color: 0xFF2E7CFF });
+            }
+            return face("SCENE A ◀ AS WRITTEN ▶ SCENE B", { value: this.crossfaderPicked ? null : "MOVE THROUGH THE MIDDLE" });
         case "tempo":
             if (d === 0) return face("TEMPO", { value: format0(model.bpm) });
             return face("SWING", { value: `${model.swing}%` });
@@ -795,14 +882,22 @@ export class TrigMapper {
             }
         case "padModeButton":
             return "The deck's pad mode: HOT CUE = STEPS, BEAT LOOP = KEYS, BEAT JUMP = TRACKS, SAMPLER = PATTERNS. Each deck has its own.";
-        case "play": return "PLAY / STOP. SHIFT + PLAY: start again from the top.";
+        case "play": {
+            const me = d === 0 ? "A" : "B";
+            if (model.deckPlaying(d)) return `STOP: stops deck ${me}. SHIFT + PLAY: start again from the top.`;
+            if (model.deckPlaying(1 - d)) {
+                return `BLEND: starts deck ${me} on the next bar, silent; move the crossfader towards it to blend (the Smart Fader). `
+                    + "The knobs become its EQ and filter until the blend is done.";
+            }
+            return `PLAY: starts deck ${me}'s pattern. SHIFT + PLAY: start again from the top.`;
+        }
         case "cue":
             return d === 0 ? "REC: records what you play on the KEYS pads into the steps. Press again to stop."
                            : "TAP: tap in time to set the tempo. SHIFT + TAP: back to the tempo from before the taps.";
         case "sync":
             return d === 0
                 ? "FILL: hold to play the fills (steps whose condition is FILL). SHIFT + FILL: AUTOPILOT arranges the pattern in 8-bar phrases (again: off)."
-                : "MASTER: the 8 knobs set the master delay, reverb, compressor, DJ filter and volume; BROWSE picks a sound pack.";
+                : "EDIT A / B: which deck's pattern the pads, knobs and jogs edit. SHIFT: the MASTER page (master effects, sound packs).";
         case "loopIn": return this.#pageExplain(d === 0 ? PAGE.trig : PAGE.amp);
         case "loopOut": return this.#pageExplain(d === 0 ? PAGE.src : PAGE.fx);
         case "reloop": return this.#pageExplain(d === 0 ? PAGE.fltr : PAGE.lfo);
@@ -811,7 +906,10 @@ export class TrigMapper {
             return "PAGE - / +: which 16 steps the pads show, on a track longer than 16. SHIFT + PAGE - / +: the track 16 steps shorter / longer.";
         case "load":
             if (held) return d === 0 ? "SLIDE: the held step slides into the next note." : "ACCENT: the held step is accented: louder and brighter.";
-            return d === 0 ? "PAT -: the previous pattern (it starts when this one ends)." : "PAT +: the next pattern (it starts when this one ends).";
+        {
+            const me = d === 0 ? "A" : "B";
+            return `LOAD ${me}: the next pattern on deck ${me} (SHIFT: the previous); at once if it is stopped, else when its pattern ends.`;
+        }
         case "browse": case "browsePress":
             if (this.#heldTrackPads.size > 0) return "Turn: how many hits, spread evenly over the track (Euclidean). Push: roll the dice.";
             if (held) return "Turn: the held step's condition: when it plays (ALWAYS, FILL, a chance, 1:4...).";
@@ -829,7 +927,12 @@ export class TrigMapper {
         case "fxChannel": return "Where the beat effect goes: deck A (tracks 1-4), deck B (tracks 5-8) or everything (MASTER).";
         case "trim": return d === 0 ? "DRIVE A: saturation on deck A's tracks (1-4)." : "DRIVE B: saturation on deck B's tracks (5-8).";
         case "channelFader": return d === 0 ? "DECK A: the volume of tracks 1-4." : "DECK B: the volume of tracks 5-8.";
-        case "crossfader": return "Morphs from scene A (left) through the pattern as written (middle) to scene B (right). Double-click: the middle.";
+        case "crossfader":
+            if (model.blending) {
+                return `SMART FADER: towards deck ${model.blendTo === 0 ? "A" : "B"} it blends: volumes, the bass swapped at the middle, `
+                    + "the tempo gliding. Held at the end for a bar, the blend is done and the old deck stops.";
+            }
+            return "Morphs from scene A (left) through the pattern as written (middle) to scene B (right). Double-click: the middle.";
         case "tempo":
             return d === 0 ? "TEMPO: pull towards you to speed up, as on a DJ deck. It takes over once it reaches the current tempo."
                            : "SWING: delays every second sixteenth (50%: straight; higher: more shuffle).";
@@ -840,6 +943,13 @@ export class TrigMapper {
         default: {
             const slot = TrigMapper.slot(c);
             if (slot === null || slot === undefined) return "Not used by TRIGDECK.";
+            if (model.blending) {                     // (DJ decks) the DJ EQ and filter while blending
+                const me = slot < 4 ? "A" : "B", role = slot % 4;
+                const what = role === 3 ? `deck ${me}'s DJ filter: left low-pass, right high-pass, the middle off`
+                    : `deck ${me}'s ${["highs", "mids", "lows"][role]}: left to cut them away, the middle flat, right up to +6 dB`;
+                return `During the blend: ${what}. It starts flat and takes over once you pass the middle; `
+                    + "after the blend the knob edits the pattern again.";
+            }
             if (this.page === PAGE.master) return model.globalHelp(slot) + " Double-click: the default.";
             let out = model.paramHelp(this.track, this.param(slot));
             if (this.sceneEdit !== null) out += ` Turning it now sets scene ${this.sceneEdit === 0 ? "A" : "B"}'s value.`;
@@ -864,6 +974,7 @@ export class TrigMapper {
     knobFace(slot) {
         const model = this.model, track = this.track;
         const color = COLORS.knobRow[slot % 4];
+        if (model.blending) return this.#djKnobFace(slot, color);
         if (this.page === PAGE.master) {
             const info = model.globalInfo(slot);
             if (!info) return face(NO_PARAM, { color });

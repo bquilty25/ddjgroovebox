@@ -39,10 +39,15 @@ EXPORT(tdw_muted) int tdw_muted(int t) { return t >= 0 && t < TD_TRACKS ? g_st.m
  * heavy part (full = 1):   per track and step: trig, note, velocity, cond, retrig, micro, locks, slide, accent;
  *                          per track and step, 8 locks: param, value (param -1: none);
  *                          per scene: count, then 128 x (track, param, value);
- *                          the 16 patterns' names, 12 characters each */
-#define SNAP_LIGHT (8 + TD_TRACKS * (5 + 2 * TD_NPARAMS) + TD_SLOTS + 2)   /* (+ the output peaks, x 1e6) */
+ *                          the 16 patterns' names, 12 characters each;
+ *                          (DJ decks) both decks' steps: per deck, track and step, 1 trig | 2 locks | 4 a condition
+ * (DJ decks) in the light part, after the peaks: focus, on air, blending, blend to, blend x x 1e6, the two tempos x 100,
+ *                          per deck: pattern, queued, playing, gain x 1e6, low / mid / high x 1e6;
+ *                          per deck and track: playing step, machine, muted, length, level x 1e6 */
+#define SNAP_DECKS (7 + TD_DECKS * 7 + TD_DECKS * TD_TRACKS * 5)
+#define SNAP_LIGHT (8 + TD_TRACKS * (5 + 2 * TD_NPARAMS) + TD_SLOTS + 2 + SNAP_DECKS)   /* (+ the output peaks, x 1e6) */
 #define SNAP_FULL (SNAP_LIGHT + TD_TRACKS * TD_STEPS * 9 + TD_TRACKS * TD_STEPS * TD_LPS * 2 + 2 * (1 + TD_SCENE_MAX * 3) \
-                   + TD_PATTERNS * TD_PATTERN_NAME)
+                   + TD_PATTERNS * TD_PATTERN_NAME + TD_DECKS * TD_TRACKS * TD_STEPS)
 static int32_t g_snap[SNAP_FULL];
 
 static uint32_t pattern_hash(const td_pattern_t *P)        /* FNV-1a over the steps, locks, scenes and lengths */
@@ -55,6 +60,13 @@ static uint32_t pattern_hash(const td_pattern_t *P)        /* FNV-1a over the st
     h = (h ^ P->nscene[0]) * 16777619u;
     for (int p = 0; p < TD_PATTERNS; p++)                      /* (the names: a copy or a load renames another) */
         for (int k = 0; k < TD_PATTERN_NAME; k++) h = (h ^ (uint8_t)E.pat[p].name[k]) * 16777619u;
+    for (int d = 0; d < TD_DECKS; d++) {                       /* (DJ decks: the other deck's pattern too) */
+        const td_pattern_t *Q = &E.pat[E.dk[d].pat];
+        h = (h ^ (uint32_t)E.dk[d].pat) * 16777619u;
+        const uint8_t *s = (const uint8_t *)Q->step;
+        for (size_t i = 0; i < sizeof Q->step; i++) h = (h ^ s[i]) * 16777619u;
+        for (int t = 0; t < TD_TRACKS; t++) h = (h ^ Q->length[t]) * 16777619u;
+    }
     return (h ^ P->nscene[1]) * 16777619u;
 }
 
@@ -75,6 +87,19 @@ EXPORT(tdw_snapshot) int32_t *tdw_snapshot(int full)
     for (int s = 0; s < TD_SLOTS; s++) *o++ = td_global_get(s);
     *o++ = (int32_t)lroundf(g_st.peak_l * 1e6f);
     *o++ = (int32_t)lroundf(g_st.peak_r * 1e6f);
+    *o++ = g_st.focus; *o++ = g_st.on_air; *o++ = g_st.blending; *o++ = g_st.blend_to;   /* (DJ decks) */
+    *o++ = (int32_t)lroundf(g_st.blend_x * 1e6f);
+    *o++ = (int32_t)lroundf(g_st.bpm_from * 100.f); *o++ = (int32_t)lroundf(g_st.bpm_to * 100.f);
+    for (int d = 0; d < TD_DECKS; d++) {
+        *o++ = g_st.deck_pattern[d]; *o++ = g_st.deck_queued[d]; *o++ = g_st.deck_playing[d];
+        *o++ = (int32_t)lroundf(g_st.deck_gain[d] * 1e6f);
+        for (int b = 0; b < 3; b++) *o++ = (int32_t)lroundf(g_st.deck_band[d][b] * 1e6f);
+    }
+    for (int d = 0; d < TD_DECKS; d++)
+        for (int t = 0; t < TD_TRACKS; t++) {
+            *o++ = g_st.deck_step[d][t]; *o++ = g_st.deck_machine[d][t]; *o++ = g_st.deck_muted[d][t];
+            *o++ = g_st.deck_length[d][t]; *o++ = (int32_t)lroundf(g_st.deck_track_level[d][t] * 1e6f);
+        }
     if (full) {
         const td_pattern_t *P = &E.pat[E.cur];
         for (int t = 0; t < TD_TRACKS; t++)
@@ -101,6 +126,14 @@ EXPORT(tdw_snapshot) int32_t *tdw_snapshot(int full)
         }
         for (int p = 0; p < TD_PATTERNS; p++)
             for (int k = 0; k < TD_PATTERN_NAME; k++) *o++ = (uint8_t)E.pat[p].name[k];
+        for (int d = 0; d < TD_DECKS; d++) {                   /* (DJ decks) both decks' steps, for the strip */
+            const td_pattern_t *Q = &E.pat[E.dk[d].pat];
+            for (int t = 0; t < TD_TRACKS; t++)
+                for (int s = 0; s < TD_STEPS; s++) {
+                    const td_step_t *st = &Q->step[t][s];
+                    *o++ = (st->trig ? 1 : 0) | (st->nlocks ? 2 : 0) | (st->trig && st->cond ? 4 : 0);
+                }
+        }
     }
     return g_snap;
 }

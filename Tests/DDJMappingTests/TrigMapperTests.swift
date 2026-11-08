@@ -42,6 +42,12 @@ final class FakeTrig: TrigModel {
     var condCount: Int { 17 }
     func machineName(_ m: Int) -> String { ["KICK", "SNARE", "HAT", "CLAP", "TOM", "SYNTH", "FM", "SAMPLE"][m] }
     func trackLevel(_ t: Int) -> Double { 0 }
+    // (DJ decks)
+    var focus = 0, onAir = 0, blendTo = 1, blendX = 0.0, blending = false
+    var deckPats = [0, 4], deckOn = [false, false]
+    func deckPattern(_ d: Int) -> Int { deckPats[d] }
+    func deckQueued(_ d: Int) -> Int? { nil }
+    func deckPlaying(_ d: Int) -> Bool { deckOn[d] }
 
     /// apply the actions the way the engine would, so a sequence of events sees its own effects
     func apply(_ actions: [TrigAction]) {
@@ -63,6 +69,13 @@ final class FakeTrig: TrigModel {
             case let .stepSlide(t, s, on): var v = step(track: t, step: s); v.slide = on; steps[t * 100 + s] = v
             case let .stepAccent(t, s, on): var v = step(track: t, step: s); v.accent = on; steps[t * 100 + s] = v
             case let .autopilot(on): autopilot = on
+            case let .deckPlay(d, on):                   // (as the engine: started while the other plays, a blend)
+                if on && deckOn[1 - d] { blending = true; blendTo = d; blendX = 0 }
+                if !on { blending = false }
+                deckOn[d] = on
+            case let .deckPattern(d, p): deckPats[d] = p
+            case let .focus(d): focus = d
+            case let .blendFader(x): blendX = x
             default: break
             }
         }
@@ -172,6 +185,43 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.face(.pad(.left, 1))?.title, "P02", "no name: the number")
     }
 
+    // MARK: (DJ decks)
+
+    func testPlayAndBlend() {
+        XCTAssertEqual(m.face(.play(.left))?.title, "PLAY")
+        XCTAssertEqual(send(.play(.left), .press(true)), [.deckPlay(deck: 0, on: true)], "PLAY A: deck A")
+        XCTAssertEqual(m.face(.play(.right))?.title, "BLEND", "the waiting deck's PLAY starts a blend")
+        send(.crossfader, .absolute(0.5))                                  // (taken over: scenes, as written)
+        XCTAssertEqual(send(.play(.right), .press(true)), [.deckPlay(deck: 1, on: true)])
+        XCTAssertTrue(model.blending)
+        XCTAssertEqual(send(.crossfader, .absolute(0.75)), [.blendFader(0.5)], "from where it was to deck B's side")
+        XCTAssertEqual(send(.crossfader, .absolute(1.0)), [.blendFader(1.0)])
+        XCTAssertEqual(m.face(.crossfader)?.title, "SMART FADER → DECK B")
+        // the knobs: deck A's EQ on the left channel, taken over through the middle
+        XCTAssertEqual(m.knobFace(2).title, "LOW A")
+        XCTAssertEqual(send(.eqLow(.left), .absolute(0.1)), [], "a knob left low does not kill the bass at once")
+        XCTAssertEqual(send(.eqLow(.left), .absolute(0.49)), [.deckEQ(deck: 0, band: 0, value: 0.49)])
+        XCTAssertEqual(send(.eqLow(.left), .absolute(0.0)), [.deckEQ(deck: 0, band: 0, value: 0.0)])
+        XCTAssertEqual(m.knobFace(2).value, "KILL")
+        XCTAssertEqual(send(.eqHi(.right), .absolute(0.5)), [.deckEQ(deck: 1, band: 2, value: 0.5)], "HI B: band 2")
+        XCTAssertEqual(send(.cfx(.right), .absolute(0.5)), [.deckFilter(deck: 1, value: 0)])
+        // the blend done (the engine's word): the knobs edit again, the crossfader is the scenes' through the middle
+        model.blending = false
+        _ = m.tick()
+        XCTAssertNotEqual(m.knobFace(2).title, "LOW A")
+        XCTAssertEqual(send(.crossfader, .absolute(0.9)), [], "back to scenes: takes over through the middle")
+        XCTAssertEqual(send(.play(.left), .press(true)), [.deckPlay(deck: 0, on: false)], "PLAY on a playing deck: stop")
+    }
+
+    func testRightSyncChoosesTheDeckEdited() {
+        XCTAssertEqual(m.face(.sync(.right))?.title, "EDIT A")
+        XCTAssertEqual(send(.sync(.right), .press(true)), [.focus(1)])
+        XCTAssertEqual(m.face(.sync(.right))?.title, "EDIT B")
+        XCTAssertEqual(send(.sync(.right), .press(true)), [.focus(0)])
+        XCTAssertEqual(m.face(.load(.right))?.title, "LOAD B")
+        XCTAssertEqual(m.face(.load(.right))?.value, "P05")
+    }
+
     func testExplainSaysWhatEachControlDoes() {
         let controls: [DDJControl] = [.play(.left), .cue(.left), .cue(.right), .sync(.left), .sync(.right), .loopIn(.left),
                                       .callLeft(.left), .callRight(.right), .load(.left), .browse, .headphoneCue(.left),
@@ -257,7 +307,8 @@ final class TrigMapperTests: XCTestCase {
     func testPatternsModeQueuesAndCopies() {
         XCTAssertEqual(tap(.pad(.right, 2), mode: .sampler), [.queuePattern(10)])
         XCTAssertEqual(tap(.pad(.left, 7), mode: .sampler, shifted: true), [.copyPattern(from: 0, to: 7)])
-        XCTAssertEqual(send(.load(.right), .press(true)), [.queuePattern(1)])
+        XCTAssertEqual(send(.load(.right), .press(true)), [.deckPattern(deck: 1, pattern: 5)], "LOAD B: deck B's next pattern")
+        XCTAssertEqual(send(.load(.left), .press(true), shifted: true), [.deckPattern(deck: 0, pattern: 15)], "SHIFT: the previous")
     }
 
     // MARK: pages, scenes, master
@@ -266,11 +317,11 @@ final class TrigMapperTests: XCTestCase {
         send(.loopOut(.right), .press(true))
         XCTAssertEqual(m.page, .fx)
         XCTAssertEqual(m.face(.loopOut(.right))?.light, .on)
-        send(.sync(.right), .press(true))
-        XCTAssertEqual(m.page, .master)
+        send(.sync(.right), .press(true), shifted: true)
+        XCTAssertEqual(m.page, .master, "SHIFT + right BEAT SYNC: MASTER")
         send(.eqHi(.left), .absolute(0.5))
         XCTAssertEqual(send(.eqHi(.left), .absolute(0.6)), [.globalSet(slot: 0, value: 60)])
-        send(.sync(.right), .press(true))
+        send(.sync(.right), .press(true), shifted: true)
         XCTAssertEqual(m.page, .fx, "MASTER again: back to the page before")
     }
 
@@ -347,7 +398,7 @@ final class TrigMapperTests: XCTestCase {
     }
 
     func testPacksOnTheMasterPage() {
-        send(.sync(.right), .press(true)); send(.sync(.right), .press(false))   // the MASTER page
+        send(.sync(.right), .press(true), shifted: true); send(.sync(.right), .press(false))   // the MASTER page
         XCTAssertEqual(m.page, .master)
         XCTAssertEqual(m.face(.browse)?.title, "PACK")
         XCTAssertEqual(m.face(.browse)?.value, "808")
@@ -362,7 +413,7 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(send(.browsePress, .press(true), shifted: true), [.revertPack])
         XCTAssertNil(m.packLoaded)
         // other pages: BROWSE is the track again
-        send(.sync(.right), .press(true)); send(.sync(.right), .press(false))
+        send(.sync(.right), .press(true), shifted: true); send(.sync(.right), .press(false))
         XCTAssertNotEqual(m.page, .master)
         XCTAssertEqual(m.face(.browse)?.title == "PACK", false)
     }

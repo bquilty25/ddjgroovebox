@@ -49,6 +49,12 @@ class FakeTrig {
     condName(c) { return c === 0 ? "ALWAYS" : `C${c}`; }
     machineName(m) { return ["KICK", "SNARE", "HAT", "CLAP", "TOM", "SYNTH", "FM", "SAMPLE"][m]; }
     trackLevel(t) { return 0; }
+    // (DJ decks)
+    focus = 0; onAir = 0; blendTo = 1; blendX = 0; blending = false;
+    deckPats = [0, 4]; deckOn = [false, false];
+    deckPattern(d) { return this.deckPats[d]; }
+    deckQueued(d) { return null; }
+    deckPlaying(d) { return this.deckOn[d]; }
 
     #edit(t, s, f) { const v = { ...this.step(t, s) }; f(v); this.steps.set(t * 100 + s, v); }
 
@@ -73,6 +79,14 @@ class FakeTrig {
             case "stepSlide": this.#edit(a.track, a.step, (v) => { v.slide = a.on; }); break;
             case "stepAccent": this.#edit(a.track, a.step, (v) => { v.accent = a.on; }); break;
             case "autopilot": this.autopilot = a.on; break;
+            case "deckPlay":                             // (as the engine: started while the other plays, a blend)
+                if (a.on && this.deckOn[1 - a.deck]) { this.blending = true; this.blendTo = a.deck; this.blendX = 0; }
+                if (!a.on) this.blending = false;
+                this.deckOn[a.deck] = a.on;
+                break;
+            case "deckPattern": this.deckPats[a.deck] = a.pattern; break;
+            case "focus": this.focus = a.deck; break;
+            case "blendFader": this.blendX = a.value; break;
             default: break;
             }
         }
@@ -188,6 +202,41 @@ test("pattern pads show the names", () => {
     assert.equal(m.face(C.pad(0, 1)).title, "P02");
 });
 
+// (DJ decks)
+test("PLAY per deck, a blend, the Smart Fader, the DJ EQ", () => {
+    const { m, model, send } = setUp();
+    assert.equal(m.face(C.play(0)).title, "PLAY");
+    assert.deepStrictEqual(send(C.play(0), press(true)), [{ type: "deckPlay", deck: 0, on: true }]);
+    assert.equal(m.face(C.play(1)).title, "BLEND");
+    send(C.crossfader, absolute(0.5));
+    assert.deepStrictEqual(send(C.play(1), press(true)), [{ type: "deckPlay", deck: 1, on: true }]);
+    assert.ok(model.blending);
+    assert.deepStrictEqual(send(C.crossfader, absolute(0.75)), [{ type: "blendFader", value: 0.5 }]);
+    assert.deepStrictEqual(send(C.crossfader, absolute(1)), [{ type: "blendFader", value: 1 }]);
+    assert.equal(m.face(C.crossfader).title, "SMART FADER → DECK B");
+    assert.equal(m.knobFace(2).title, "LOW A");
+    assert.deepStrictEqual(send(C.eqLow(0), absolute(0.1)), [], "a knob left low does not kill the bass at once");
+    assert.deepStrictEqual(send(C.eqLow(0), absolute(0.49)), [{ type: "deckEQ", deck: 0, band: 0, value: 0.49 }]);
+    assert.deepStrictEqual(send(C.eqLow(0), absolute(0)), [{ type: "deckEQ", deck: 0, band: 0, value: 0 }]);
+    assert.equal(m.knobFace(2).value, "KILL");
+    assert.deepStrictEqual(send(C.eqHi(1), absolute(0.5)), [{ type: "deckEQ", deck: 1, band: 2, value: 0.5 }]);
+    assert.deepStrictEqual(send(C.cfx(1), absolute(0.5)), [{ type: "deckFilter", deck: 1, value: 0 }]);
+    model.blending = false;
+    m.tick();
+    assert.notEqual(m.knobFace(2).title, "LOW A");
+    assert.deepStrictEqual(send(C.crossfader, absolute(0.9)), [], "back to scenes: takes over through the middle");
+    assert.deepStrictEqual(send(C.play(0), press(true)), [{ type: "deckPlay", deck: 0, on: false }]);
+});
+
+test("the right BEAT SYNC chooses the deck edited", () => {
+    const { m, send } = setUp();
+    assert.equal(m.face(C.sync(1)).title, "EDIT A");
+    assert.deepStrictEqual(send(C.sync(1), press(true)), [{ type: "focus", deck: 1 }]);
+    assert.equal(m.face(C.sync(1)).title, "EDIT B");
+    assert.equal(m.face(C.load(1)).title, "LOAD B");
+    assert.equal(m.face(C.load(1)).value, "P05");
+});
+
 test("explain says what each control does", () => {
     const { m, model, send } = setUp();
     const controls = [C.play(0), C.cue(0), C.cue(1), C.sync(0), C.sync(1), C.loopIn(0), C.callLeft(0), C.callRight(1), C.load(0),
@@ -276,7 +325,8 @@ test("patterns mode queues and copies", () => {
     const { send, tap } = setUp();
     assert.deepStrictEqual(tap(C.pad(1, 2), { mode: "sampler" }), [{ type: "queuePattern", pattern: 10 }]);
     assert.deepStrictEqual(tap(C.pad(0, 7), { mode: "sampler", shifted: true }), [{ type: "copyPattern", from: 0, to: 7 }]);
-    assert.deepStrictEqual(send(C.load(1), press(true)), [{ type: "queuePattern", pattern: 1 }]);
+    assert.deepStrictEqual(send(C.load(1), press(true)), [{ type: "deckPattern", deck: 1, pattern: 5 }], "LOAD B: deck B's next");
+    assert.deepStrictEqual(send(C.load(0), press(true), { shifted: true }), [{ type: "deckPattern", deck: 0, pattern: 15 }]);
 });
 
 // MARK: pages, scenes, master
@@ -286,11 +336,11 @@ test("pages from loop buttons", () => {
     send(C.loopOut(1), press(true));
     assert.equal(m.page, PAGE.fx);
     assert.equal(m.face(C.loopOut(1)).light, ON);
-    send(C.sync(1), press(true));
-    assert.equal(m.page, PAGE.master);
+    send(C.sync(1), press(true), { shifted: true });
+    assert.equal(m.page, PAGE.master, "SHIFT + right BEAT SYNC: MASTER");
     send(C.eqHi(0), absolute(0.5));
     assert.deepStrictEqual(send(C.eqHi(0), absolute(0.6)), [{ type: "globalSet", slot: 0, value: 60 }]);
-    send(C.sync(1), press(true));
+    send(C.sync(1), press(true), { shifted: true });
     assert.equal(m.page, PAGE.fx, "MASTER again: back to the page before");
 });
 
@@ -380,7 +430,7 @@ test("track length by steps", () => {
 
 test("packs on the MASTER page", () => {
     const { m, send } = setUp();
-    send(C.sync(1), press(true)); send(C.sync(1), press(false));     // the MASTER page
+    send(C.sync(1), press(true), { shifted: true }); send(C.sync(1), press(false));     // the MASTER page
     assert.equal(m.page, PAGE.master);
     assert.equal(m.face(C.browse).title, "PACK");
     assert.equal(m.face(C.browse).value, "808");
@@ -397,7 +447,7 @@ test("packs on the MASTER page", () => {
     assert.equal(m.packLoaded, null);
     assert.equal(m.packReverted, 100);
     // other pages: BROWSE is the track again
-    send(C.sync(1), press(true)); send(C.sync(1), press(false));
+    send(C.sync(1), press(true), { shifted: true }); send(C.sync(1), press(false));
     assert.notEqual(m.page, PAGE.master);
     assert.notEqual(m.face(C.browse).title, "PACK");
 });

@@ -60,6 +60,10 @@ public enum TrigAction: Hashable, Sendable {
     case loadPack(Int), revertPack
     /// a track's length (1 ... 64 steps); new steps repeat the old ones
     case length(track: Int, steps: Int)
+    /// (DJ decks) start / stop a deck (started while the other plays: a blend); a deck's pattern; the deck edited
+    case deckPlay(deck: Int, on: Bool), deckPattern(deck: Int, pattern: Int), focus(Int)
+    /// (DJ decks) the DJ EQ (band 0 low, 1 mid, 2 high; 0 kill, 0.5 flat, 1 +6 dB), the DJ filter (-1 ... 1), the Smart Fader
+    case deckEQ(deck: Int, band: Int, value: Double), deckFilter(deck: Int, value: Double), blendFader(Double)
 }
 
 /// A parameter as the engine describes it (td_param_info).
@@ -105,10 +109,28 @@ public protocol TrigModel: AnyObject {
     func trackLevel(_ track: Int) -> Double                // output level 0...1
     /// the sound packs' names (kits for all 8 tracks), in the engine's order
     var packNames: [String] { get }
+    /// (DJ decks) the deck edited, the deck heard, each deck's pattern (queued: its next one) and transport
+    var focus: Int { get }
+    var onAir: Int { get }
+    func deckPattern(_ d: Int) -> Int
+    func deckQueued(_ d: Int) -> Int?
+    func deckPlaying(_ d: Int) -> Bool
+    /// a blend in progress (to deck blendTo), the Smart Fader's position
+    var blending: Bool { get }
+    var blendTo: Int { get }
+    var blendX: Double { get }
 }
 
 public extension TrigModel {
     var packNames: [String] { [] }
+    var focus: Int { 0 }
+    var onAir: Int { 0 }
+    func deckPattern(_ d: Int) -> Int { d == 0 ? pattern : 4 }
+    func deckQueued(_ d: Int) -> Int? { d == 0 ? queuedPattern : nil }
+    func deckPlaying(_ d: Int) -> Bool { d == 0 && playing }
+    var blending: Bool { false }
+    var blendTo: Int { 1 }
+    var blendX: Double { 0 }
 }
 
 public struct StepView: Hashable, Sendable {

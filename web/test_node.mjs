@@ -55,5 +55,25 @@ for (let i = 0; i < 3; i++) {
     check(`a fresh engine loads it (${i + 1}): ${y.tdw_bpm().toFixed(0)} BPM`, ok && Math.abs(y.tdw_bpm() - 133) < 0.01);
 }
 
+// (DJ decks) both decks playing, blended half way: a sane level, and well within real time (16 tracks)
+{
+    const z = instantiate(bytes);
+    z.tdw_init();
+    z.td_deck_play(0, 1);
+    for (let i = 0; i < 48000 * 2; i += 128) z.tdw_render(128);
+    z.td_deck_play(1, 1);
+    z.td_blend_fader(0.5);
+    let e = 0, pk = 0;
+    const N = 48000 * 8, t0 = performance.now();
+    for (let i = 0; i < N; i += 128) {
+        const o = new Float32Array(z.memory.buffer, z.tdw_render(128), 256);
+        for (const v of o) { e += v * v; pk = Math.max(pk, Math.abs(v)); }
+    }
+    const ms = performance.now() - t0, rms = 10 * Math.log10(e / (2 * N) + 1e-12);
+    z.tdw_state();
+    check(`two decks (P01 + P05) mid-blend, 8 s: rms ${rms.toFixed(1)} dBFS, peak ${pk.toFixed(2)}`, pk <= 1 && rms > -24 && rms < -8);
+    check(`  rendered in ${ms.toFixed(0)} ms (${(ms / 80).toFixed(1)} % of real time)`, ms < 8000 * 0.25);
+}
+
 console.log(fails ? `${fails} failed` : "all ok");
 process.exit(fails ? 1 : 0);

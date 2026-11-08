@@ -6,17 +6,20 @@
 import { instantiateAsync, cString } from "./wasi.js";
 import { MACHINE } from "./vocab.js";
 
-const TRACKS = 8, NPARAMS = 48, SLOTS = 8, STEPS = 64, LPS = 8, SCENE_MAX = 128;
+const TRACKS = 8, NPARAMS = 48, SLOTS = 8, STEPS = 64, LPS = 8, SCENE_MAX = 128, DECKS = 2;
 const PER_TRACK = 5 + 2 * NPARAMS;
-const LIGHT = 8 + TRACKS * PER_TRACK + SLOTS + 2;           // (td_web.c's SNAP_LIGHT: + the output peaks)
+const DECKS_AT = 8 + TRACKS * PER_TRACK + SLOTS + 2;        // (DJ decks: after the output peaks)
+const DECK_ROWS_AT = DECKS_AT + 7 + DECKS * 7;
+const LIGHT = DECK_ROWS_AT + DECKS * TRACKS * 5;            // (td_web.c's SNAP_LIGHT)
 const STEPS_AT = LIGHT, LOCKS_AT = STEPS_AT + TRACKS * STEPS * 9, SCENES_AT = LOCKS_AT + TRACKS * STEPS * LPS * 2;
 const PATTERNS = 16, NAME = 12, NAMES_AT = SCENES_AT + 2 * (1 + SCENE_MAX * 3);   // (the patterns' names)
+const DECK_STEPS_AT = NAMES_AT + PATTERNS * NAME;           // (DJ decks: both decks' steps, 1 trig | 2 locks | 4 cond)
 const PROJECT_KEY = "trigdeck.project.v2";
 
 export class TrigWebEngine {
     constructor() {
         this.light = new Int32Array(LIGHT);
-        this.heavy = new Int32Array(NAMES_AT + PATTERNS * NAME);
+        this.heavy = new Int32Array(DECK_STEPS_AT + DECKS * TRACKS * STEPS);
         this.infoCache = new Map();
         this.nextCaptureSlot = 4;
         this.dirty = false;
@@ -108,6 +111,12 @@ export class TrigWebEngine {
             case "loadPack": c.push(["td_pack_load", a.pack]); break;
             case "revertPack": c.push(["td_pack_revert"]); break;
             case "length": c.push(["td_set_length_repeat", a.track, a.steps]); break;
+            case "deckPlay": c.push(["td_deck_play", a.deck, a.on ? 1 : 0]); break;          // (DJ decks)
+            case "deckPattern": c.push(["td_deck_pattern", a.deck, a.pattern]); break;
+            case "focus": c.push(["td_focus", a.deck]); this.infoCache.clear(); break;
+            case "deckEQ": c.push(["td_deck_eq", a.deck, a.band, a.value]); break;
+            case "deckFilter": c.push(["td_deck_filter", a.deck, a.value]); break;
+            case "blendFader": c.push(["td_blend_fader", a.value]); break;
             default: console.warn("TRIGDECK: no engine call for", a);
             }
         }
@@ -135,6 +144,25 @@ export class TrigWebEngine {
     get playing() { return this.light[0] !== 0; }
     get recording() { return this.light[1] !== 0; }
     get pattern() { return this.light[2]; }
+    // (DJ decks) the deck edited, the deck heard, the blend, each deck's pattern, transport and gains
+    get focus() { return this.light[DECKS_AT]; }
+    get onAir() { return this.light[DECKS_AT + 1]; }
+    get blending() { return this.light[DECKS_AT + 2] !== 0; }
+    get blendTo() { return this.light[DECKS_AT + 3]; }
+    get blendX() { return this.light[DECKS_AT + 4] / 1e6; }
+    get blendTempos() { return { from: this.light[DECKS_AT + 5] / 100, to: this.light[DECKS_AT + 6] / 100 }; }
+    #dk(d) { return DECKS_AT + 7 + d * 7; }
+    deckPattern(d) { return this.light[this.#dk(d)]; }
+    deckQueued(d) { const q = this.light[this.#dk(d) + 1]; return q >= 0 && q !== this.deckPattern(d) ? q : null; }
+    deckPlaying(d) { return this.light[this.#dk(d) + 2] !== 0; }
+    deckGains(d) { const o = this.#dk(d); return { gain: this.light[o + 3] / 1e6, bands: [0, 1, 2].map((b) => this.light[o + 4 + b] / 1e6) }; }
+    /** deck d's track t as the strip shows it */
+    deckRow(d, t) {
+        const o = DECK_ROWS_AT + (d * TRACKS + t) * 5, l = this.light;
+        return { step: l[o], machine: l[o + 1], muted: l[o + 2] !== 0, length: Math.max(1, l[o + 3]), level: l[o + 4] / 1e6 };
+    }
+    /** deck d's track t's step s: 1 trig | 2 locks | 4 a condition */
+    deckStep(d, t, s) { return this.heavy[DECK_STEPS_AT + (d * TRACKS + t) * STEPS + s] ?? 0; }
     /** a pattern's name ("DEEP"; "" without one) */
     patternName(p) {
         if (!(p >= 0 && p < PATTERNS)) return "";

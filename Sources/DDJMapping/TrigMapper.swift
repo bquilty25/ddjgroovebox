@@ -62,6 +62,12 @@ public final class TrigMapper {
     /// the crossfader has passed the middle since the start (until then it leaves the scenes in the middle)
     public private(set) var crossfaderPicked = false
     private var crossfaderLast: Double?
+    // (DJ decks) the crossfader's position; where it was when a blend began; the EQ knobs taken over in the blend
+    private var crossfaderPos = 0.5
+    private var blendStart: Double?
+    private var eqPicked: Set<Int> = [], eqLast: [Int: Double] = [:]
+    public private(set) var eqPos: [Int: Double] = [:]
+    private var wasBlending = false
     private var lastTempoSet: Double?, lastSwingSet: Int?
 
     public static let ticksPerSecondAtSpeed = 400.0     // 720 ticks a turn at 33 1/3 rpm (Mixxx's DDJ-400 setting)
@@ -91,7 +97,13 @@ public final class TrigMapper {
         if case .pad(let deck, let i) = e.control, let m = e.padMode { modes[deck] = m; return pad(deck, i, e) }
         switch (e.control, e.value) {
         case (.padModeButton(let d, let m), .press(true)): modes[d] = m; return []
-        case (.play, .press(true)): return [e.shifted ? .restart : .togglePlay]
+        case (.play(let d), .press(true)):
+            // (DJ decks) PLAY starts or stops its own deck; the waiting deck started while the other plays: a blend
+            if e.shifted { return [.restart] }
+            let deck = d.rawValue
+            if model.deckPlaying(deck) { return [.deckPlay(deck: deck, on: false)] }
+            if model.deckPlaying(1 - deck) { beginBlend() }
+            return [.deckPlay(deck: deck, on: true)]
         case (.cue(.left), .press(true)): return [.toggleRecord]
         case (.cue(.right), .press(true)):
             // TAP; SHIFT + TAP: the tempo from before the taps comes back (kept until then, or another pattern)
@@ -107,9 +119,10 @@ public final class TrigMapper {
             if !down && !fillHeld { return [] }
             fillHeld = down
             return [.fill(down)]
-        case (.sync(.right), .press(true)):
+        case (.sync(.right), .press(true)) where e.shifted:          // SHIFT + right BEAT SYNC: the MASTER page
             if page == .master { page = pageBeforeMaster } else { pageBeforeMaster = page; page = .master }
             return []
+        case (.sync(.right), .press(true)): return [.focus(1 - model.focus)]   // (DJ decks) the deck edited
         case (.loopIn(let d), .press(true)): return setPage(d == .left ? .trig : .amp)
         case (.loopOut(let d), .press(true)): return setPage(d == .left ? .src : .fx)
         case (.reloop(let d), .press(true)): return setPage(d == .left ? .fltr : .lfo)
@@ -133,8 +146,9 @@ public final class TrigMapper {
                                       : .stepAccent(track: track, step: st, on: !first.accent)
                 }
             }
-            let p = (model.queuedPattern ?? model.pattern) + (d == .left ? -1 : 1)
-            return [.queuePattern(min(15, max(0, p)))]
+            // (DJ decks) LOAD: the deck's next pattern (SHIFT: the previous), at once if it is stopped, else at its end
+            let deck = d.rawValue, base = model.deckQueued(deck) ?? model.deckPattern(deck)
+            return [.deckPattern(deck: deck, pattern: (base + (e.shifted ? 15 : 1)) % 16)]
         case (.browse, .relative(let n)): return browse(n)
         case (.browsePress, .press(let down)):
             if let t = heldTrackPads.values.first {       // a track held: roll the dice on it
@@ -169,6 +183,8 @@ public final class TrigMapper {
         case (.trim(let d), .absolute(let v)): return [.deckDrive(deck: d.rawValue, drive: v)]
         case (.channelFader(let d), .absolute(let v)): return [.deckLevel(deck: d.rawValue, level: v)]
         case (.crossfader, .absolute(let v)):
+            crossfaderPos = v
+            if model.blending { return [.blendFader(blendX(v))] }    // (DJ decks) a blend: the Smart Fader
             // the app starts in the middle (the pattern as written): the crossfader takes over once it passes the middle
             if !crossfaderPicked {
                 let crossed = crossfaderLast.map { ($0 - 0.5) * (v - 0.5) <= 0 } ?? false
@@ -188,9 +204,62 @@ public final class TrigMapper {
             return [.scratch(deck: d.rawValue, touching: down, rate: 0)]
         case (.jog(let d), .relative(let n)): return jog(d, n, shifted: e.shifted)
         default:
-            if let s = Self.slot(of: e.control), case .absolute(let v) = e.value { return knob(e.control, s, v) }
+            if let s = Self.slot(of: e.control), case .absolute(let v) = e.value {
+                return model.blending ? djKnob(e.control, s, v) : knob(e.control, s, v)
+            }
             return []
         }
+    }
+
+    // MARK: (DJ decks) blends
+
+    /// a knob in a blend: HI / MID / LOW / FILTER of its channel's deck ("FLAT" until it is taken over)
+    private func djKnobFace(_ slot: Int, _ color: UInt32) -> ControlFace {
+        let deck = slot / 4, role = slot % 4, v = eqPos[slot] ?? 0.5
+        let title = ["HI", "MID", "LOW", "FILTER"][role] + (deck == 0 ? " A" : " B")
+        var value: String
+        if role == 3 {
+            value = v < 0.47 ? "LOW-PASS" : (v > 0.53 ? "HIGH-PASS" : "OFF")
+        } else {
+            let g = v < 0.5 ? (v * 2) * (v * 2) : 1 + (v - 0.5) * 2
+            let db = 20 * log10(max(g, 1e-4))
+            value = g < 0.02 ? "KILL" : (abs(db) < 0.5 ? "FLAT" : String(format: "%+.0f dB", db))
+        }
+        if !eqPicked.contains(slot) { value += " ·" }       // (not taken over yet: pass the middle)
+        return ControlFace(title: title, value: value, arc: v, color: color, badge: "DJ")
+    }
+
+    /// a blend begins (PLAY on the waiting deck): the crossfader counts from here; the EQ knobs start flat
+    private func beginBlend() {
+        wasBlending = true                                // (tick() sees the end)
+        blendStart = crossfaderPos
+        eqPicked = []
+        eqLast = [:]
+        eqPos = [:]
+    }
+    /// the Smart Fader's x from the crossfader: from where it was when the blend began (at least a quarter of its travel
+    /// away) to the new deck's side (B right, A left)
+    func blendX(_ v: Double) -> Double {
+        let target = model.blendTo == 1 ? 1.0 : 0.0
+        var p0 = blendStart ?? 0.5
+        p0 = target == 1 ? min(p0, 0.75) : max(p0, 0.25)
+        return min(1, max(0, (v - p0) / (target - p0)))
+    }
+    /// in a blend the channel's knobs are its deck's DJ EQ (HI, MID, LOW) and FILTER; each starts flat and takes over
+    /// once the knob passes its middle (a knob left anywhere from editing does not kill a band at once)
+    private func djKnob(_ c: DDJControl, _ slot: Int, _ v: Double) -> [TrigAction] {
+        knobLast[c] = v                                   // (editing resumes from here after the blend)
+        knobAcc[c] = 0
+        if !eqPicked.contains(slot) {
+            let crossed = eqLast[slot].map { ($0 - 0.5) * (v - 0.5) <= 0 } ?? false
+            eqLast[slot] = v
+            guard abs(v - 0.5) <= 0.06 || crossed else { return [] }
+            eqPicked.insert(slot)
+        }
+        eqPos[slot] = v
+        let deck = slot / 4, role = slot % 4                 // (role: 0 HI, 1 MID, 2 LOW, 3 FILTER)
+        if role == 3 { return [.deckFilter(deck: deck, value: v * 2 - 1)] }
+        return [.deckEQ(deck: deck, band: 2 - role, value: v)]
     }
 
     /// Time-based releases (call ~60 times a second): a scratched jog that stops moving holds still; a nudge ends.
@@ -202,6 +271,14 @@ public final class TrigMapper {
             out.append(.scratch(deck: d.rawValue, touching: true, rate: 0))
         }
         if let last = nudgeLast, t - last > 0.08 { nudgeLast = nil; out.append(.nudge(0)) }
+        if wasBlending && !model.blending {                // (DJ decks) a blend done: scenes again, through the middle
+            crossfaderPicked = false
+            crossfaderLast = crossfaderPos
+            blendStart = nil
+            eqPicked = []
+            eqPos = [:]
+        }
+        wasBlending = model.blending
         return out
     }
 
@@ -546,8 +623,10 @@ public final class TrigMapper {
         case .pad(let d, let i): return padFace(d, i, mode: padMode(d))
         case .padModeButton(let d, let m):
             return ControlFace(title: PadFunction(m).name, light: padMode(d) == m ? .on : .off)
-        case .play: return ControlFace(title: model.playing ? "STOP" : "PLAY", color: 0xFF1ECC70,
-                                       light: model.playing ? .on : .off)
+        case .play(let d):                               // (DJ decks) its own deck: STOP, PLAY, or BLEND (the other plays)
+            let deck = d.rawValue, on = model.deckPlaying(deck)
+            return ControlFace(title: on ? "STOP" : (model.deckPlaying(1 - deck) ? "BLEND" : "PLAY"), color: 0xFF1ECC70,
+                               light: on ? .on : .off)
         case .cue(.left): return ControlFace(title: "REC", color: 0xFFFF2C34, light: model.recording ? .on : .off)
         case .cue(.right):
             // (SHIFT + TAP: back to the tempo before the taps; shown while there is one to go back to)
@@ -555,7 +634,9 @@ public final class TrigMapper {
             return ControlFace(title: back.map { "TAP · SHIFT: \(Int($0.rounded()))" } ?? "TAP", value: "\(Int(model.bpm.rounded()))")
         case .sync(.left): return ControlFace(title: "FILL", value: model.autopilot ? "AUTOPILOT" : nil,
                                               light: fillHeld || model.autopilot ? .on : .off)
-        case .sync(.right): return ControlFace(title: "MASTER", color: TrigColors.page[6], light: page == .master ? .on : .off)
+        case .sync(.right):                              // (DJ decks) the deck edited; SHIFT: the MASTER page
+            return ControlFace(title: model.focus == 0 ? "EDIT A" : "EDIT B", value: page == .master ? "MASTER" : nil,
+                               color: TrigColors.page[6], light: page == .master ? .on : .dim)
         case .loopIn(let d): return pageFace(d == .left ? .trig : .amp)
         case .loopOut(let d): return pageFace(d == .left ? .src : .fx)
         case .reloop(let d): return pageFace(d == .left ? .fltr : .lfo)
@@ -571,7 +652,9 @@ public final class TrigMapper {
                 return d == .left ? ControlFace(title: "SLIDE", light: sv.slide ? .on : .off)
                                   : ControlFace(title: "ACCENT", light: sv.accent ? .on : .off)
             }
-            return ControlFace(title: d == .left ? "PAT -" : "PAT +")
+            let deck = d.rawValue, q = model.deckQueued(deck)       // (DJ decks) the deck's pattern (→ its next)
+            return ControlFace(title: d == .left ? "LOAD A" : "LOAD B",
+                               value: String(format: "P%02d", model.deckPattern(deck) + 1) + (q.map { String(format: "→%02d", $0 + 1) } ?? ""))
         case .browse:
             if let t = heldTrackPads.values.first {
                 return ControlFace(title: "EUCLID", value: "\(euclidPulses[t] ?? trigCount(t))/\(model.length(t))",
@@ -603,6 +686,10 @@ public final class TrigMapper {
         case .trim(let d): return ControlFace(title: d == .left ? "DRIVE A" : "DRIVE B")
         case .channelFader(let d): return ControlFace(title: d == .left ? "DECK A" : "DECK B")
         case .crossfader:
+            if model.blending {                          // (DJ decks) the Smart Fader
+                return ControlFace(title: "SMART FADER → DECK \(model.blendTo == 0 ? "A" : "B")",
+                                   value: "\(Int((model.blendX * 100).rounded()))%", color: 0xFF2E7CFF)
+            }
             return ControlFace(title: "SCENE A ◀ AS WRITTEN ▶ SCENE B", value: crossfaderPicked ? nil : "MOVE THROUGH THE MIDDLE")
         case .tempo(.left): return ControlFace(title: "TEMPO", value: String(format: "%.0f", model.bpm))
         case .tempo(.right): return ControlFace(title: "SWING", value: "\(model.swing)%")
@@ -655,13 +742,20 @@ public final class TrigMapper {
             }
         case .padModeButton:
             return "The deck's pad mode: HOT CUE = STEPS, BEAT LOOP = KEYS, BEAT JUMP = TRACKS, SAMPLER = PATTERNS. Each deck has its own."
-        case .play: return "PLAY / STOP. SHIFT + PLAY: start again from the top."
+        case .play(let d):
+            let me = d == .left ? "A" : "B"
+            if model.deckPlaying(d.rawValue) { return "STOP: stops deck \(me). SHIFT + PLAY: start again from the top." }
+            if model.deckPlaying(1 - d.rawValue) {
+                return "BLEND: starts deck \(me) on the next bar, silent; move the crossfader towards it to blend (the Smart Fader). "
+                    + "The knobs become its EQ and filter until the blend is done."
+            }
+            return "PLAY: starts deck \(me)'s pattern. SHIFT + PLAY: start again from the top."
         case .cue(.left): return "REC: records what you play on the KEYS pads into the steps. Press again to stop."
         case .cue(.right): return "TAP: tap in time to set the tempo. SHIFT + TAP: back to the tempo from before the taps."
         case .sync(.left):
             return "FILL: hold to play the fills (steps whose condition is FILL). SHIFT + FILL: AUTOPILOT arranges the pattern in 8-bar phrases (again: off)."
         case .sync(.right):
-            return "MASTER: the 8 knobs set the master delay, reverb, compressor, DJ filter and volume; BROWSE picks a sound pack."
+            return "EDIT A / B: which deck's pattern the pads, knobs and jogs edit. SHIFT: the MASTER page (master effects, sound packs)."
         case .loopIn(let d): return pageExplain(d == .left ? .trig : .amp)
         case .loopOut(let d): return pageExplain(d == .left ? .src : .fx)
         case .reloop(let d): return pageExplain(d == .left ? .fltr : .lfo)
@@ -673,7 +767,8 @@ public final class TrigMapper {
             if !held.isEmpty {
                 return d == .left ? "SLIDE: the held step slides into the next note." : "ACCENT: the held step is accented: louder and brighter."
             }
-            return d == .left ? "PAT -: the previous pattern (it starts when this one ends)." : "PAT +: the next pattern (it starts when this one ends)."
+            let me = d == .left ? "A" : "B"
+            return "LOAD \(me): the next pattern on deck \(me) (SHIFT: the previous); at once if it is stopped, else when its pattern ends."
         case .browse, .browsePress:
             if !heldTrackPads.isEmpty { return "Turn: how many hits, spread evenly over the track (Euclidean). Push: roll the dice." }
             if !held.isEmpty { return "Turn: the held step's condition: when it plays (ALWAYS, FILL, a chance, 1:4...)." }
@@ -691,6 +786,10 @@ public final class TrigMapper {
         case .trim(let d): return d == .left ? "DRIVE A: saturation on deck A's tracks (1-4)." : "DRIVE B: saturation on deck B's tracks (5-8)."
         case .channelFader(let d): return d == .left ? "DECK A: the volume of tracks 1-4." : "DECK B: the volume of tracks 5-8."
         case .crossfader:
+            if model.blending {
+                return "SMART FADER: towards deck \(model.blendTo == 0 ? "A" : "B") it blends: volumes, the bass swapped at the middle, "
+                    + "the tempo gliding. Held at the end for a bar, the blend is done and the old deck stops."
+            }
             return "Morphs from scene A (left) through the pattern as written (middle) to scene B (right). Double-click: the middle."
         case .tempo(.left): return "TEMPO: pull towards you to speed up, as on a DJ deck. It takes over once it reaches the current tempo."
         case .tempo(.right): return "SWING: delays every second sixteenth (50%: straight; higher: more shuffle)."
@@ -700,6 +799,13 @@ public final class TrigMapper {
         case .shift: return "SHIFT: hold for each control's second function (written under the buttons)."
         default:
             guard let slot = Self.slot(of: c) else { return "Not used by TRIGDECK." }
+            if model.blending {                          // (DJ decks) the DJ EQ and filter while blending
+                let me = slot / 4 == 0 ? "A" : "B", role = slot % 4
+                let what = role == 3 ? "deck \(me)'s DJ filter: left low-pass, right high-pass, the middle off"
+                    : "deck \(me)'s \(["highs", "mids", "lows"][role]): left to cut them away, the middle flat, right up to +6 dB"
+                return "During the blend: \(what). It starts flat and takes over once you pass the middle; "
+                    + "after the blend the knob edits the pattern again."
+            }
             if page == .master { return model.globalHelp(slot: slot) + " Double-click: the default." }
             let p = param(slot)
             var out = model.paramHelp(track: track, param: p)
@@ -722,6 +828,7 @@ public final class TrigMapper {
     /// what the mixer knob for the page's slot 0...7 shows (the base value, a held step's lock or a scene's value)
     public func knobFace(_ slot: Int) -> ControlFace {
         let color = TrigColors.knobRow[slot % 4]
+        if model.blending { return djKnobFace(slot, color) }
         if page == .master {
             guard let info = model.globalInfo(slot: slot) else { return ControlFace(title: "—", color: color) }
             let v = model.globalValue(slot: slot)

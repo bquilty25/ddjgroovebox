@@ -53,6 +53,32 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
     var swing: Int { Int(state.swing) }
     var autopilot: Bool { state.autopilot != 0 }
     let packNames: [String] = (0..<td_pack_count()).map { String(cString: td_pack_name($0)) }
+    // (DJ decks)
+    var focus: Int { Int(state.focus) }
+    var onAir: Int { Int(state.on_air) }
+    func deckPattern(_ d: Int) -> Int { Int(tuple(state.deck_pattern, d)) }
+    func deckQueued(_ d: Int) -> Int? {
+        let q = Int(tuple(state.deck_queued, d))
+        return q >= 0 && q != deckPattern(d) ? q : nil
+    }
+    func deckPlaying(_ d: Int) -> Bool { tuple(state.deck_playing, d) != 0 }
+    var blending: Bool { state.blending != 0 }
+    var blendTo: Int { Int(state.blend_to) }
+    var blendX: Double { Double(state.blend_x) }
+    /// a deck's track as the strip shows it (deck d's track t): its step playing, machine, mute, length, level
+    func deckRow(_ d: Int, _ t: Int) -> (step: Int, machine: Int, muted: Bool, length: Int, level: Double) {
+        func at<T>(_ x: T) -> Int32 { tuple(x, d * 8 + t) }
+        let lv = withUnsafeBytes(of: state.deck_track_level) { $0.bindMemory(to: Float.self)[d * 8 + t] }
+        return (Int(at(state.deck_step)), Int(at(state.deck_machine)), at(state.deck_muted) != 0, Int(at(state.deck_length)),
+                Double(lv))
+    }
+    /// each deck's volume and low / mid / high gains now (the Smart Fader times the EQ), the blend's two tempos
+    func deckGains(_ d: Int) -> (gain: Double, bands: [Double]) {
+        let g = withUnsafeBytes(of: state.deck_gain) { $0.bindMemory(to: Float.self)[d] }
+        let b = withUnsafeBytes(of: state.deck_band) { p in (0..<3).map { Double(p.bindMemory(to: Float.self)[d * 3 + $0]) } }
+        return (Double(g), b)
+    }
+    var blendTempos: (from: Double, to: Double) { (Double(state.bpm_from), Double(state.bpm_to)) }
 
     private func tuple<T>(_ t: T, _ i: Int) -> Int32 {
         withUnsafeBytes(of: t) { $0.bindMemory(to: Int32.self)[i] }
@@ -182,6 +208,12 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
         case let .loadPack(p): td_pack_load(i(p)); infoCache = [:]       // (machines change: their parameters' names too)
         case .revertPack: _ = td_pack_revert(); infoCache = [:]
         case let .length(t, n): td_set_length_repeat(i(t), i(n))
+        case let .deckPlay(d, on): td_deck_play(i(d), on ? 1 : 0)
+        case let .deckPattern(d, p): td_deck_pattern(i(d), i(p))
+        case let .focus(d): td_focus(i(d)); infoCache = [:]      // (the other deck's machines: other parameters)
+        case let .deckEQ(d, b, v): td_deck_eq(i(d), i(b), Float(v))
+        case let .deckFilter(d, v): td_deck_filter(i(d), Float(v))
+        case let .blendFader(x): td_blend_fader(Float(x))
         }
     }
 

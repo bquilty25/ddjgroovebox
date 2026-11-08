@@ -14,7 +14,9 @@ and Edge on macOS, Windows and Linux (Safari has no Web MIDI: the mouse and keys
                                                      # (another port: PORT=9000 sh web/serve.sh)
 
 Press START (browsers start audio only after a click), then allow MIDI when asked. **Firefox** asks once to add a small
-"site permission" add-on for the page: that is how Firefox grants MIDI. Chrome and Edge ask for MIDI with SysEx.
+"site permission" add-on for the page: that is how Firefox grants MIDI. If it never asks (it may not for localhost),
+open `about:config`, set `dom.webmidi.gated` to `false` (and check `dom.webmidi.enabled` is `true`), reload and allow.
+Chrome and Edge ask for MIDI with SysEx.
 
 The project saves in the browser (every few seconds and when the page closes). The bar above the controller:
 NEW PROJECT (the 16 default patterns), EXPORT / IMPORT (the project as a `trigdeck.project` file, the same format as

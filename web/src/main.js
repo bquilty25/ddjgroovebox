@@ -104,7 +104,16 @@ async function startMIDI() {
     if (!navigator.requestMIDIAccess) { problem = "THIS BROWSER HAS NO WEB MIDI: USE FIREFOX, CHROME OR EDGE (THE MOUSE AND KEYS WORK)"; return; }
     let access;
     try { access = await navigator.requestMIDIAccess({ sysex: true }); }
-    catch { try { access = await navigator.requestMIDIAccess(); } catch { problem = "MIDI NOT ALLOWED (THE MOUSE AND KEYS WORK)"; return; } }
+    catch {
+        try { access = await navigator.requestMIDIAccess(); }
+        catch {
+            problem = /firefox/i.test(navigator.userAgent)
+                ? "FIREFOX REFUSED MIDI: IN ABOUT:CONFIG SET DOM.WEBMIDI.GATED TO FALSE, RELOAD, ALLOW (THE MOUSE AND KEYS WORK)"
+                : "MIDI NOT ALLOWED: ALLOW IT IN THE SITE SETTINGS AND RELOAD (THE MOUSE AND KEYS WORK)";
+            status(problem.toLowerCase(), true);
+            return;
+        }
+    }
     const find = () => {
         const isDDJ = (p) => /DDJ-(400|FLX4)/i.test(p.name);
         const was = midiIn;

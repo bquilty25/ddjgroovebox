@@ -10,5 +10,5 @@ if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "port $PORT is in use by another program: try  PORT=9000 sh web/serve.sh"
     exit 1
 fi
-echo "open http://localhost:$PORT/web/ in Chrome or Edge (Ctrl-C here to stop)"
+echo "open http://localhost:$PORT/web/ in Firefox, Chrome or Edge (Ctrl-C here to stop)"
 exec python3 web/serve.py "$PORT"                     # (no caching: a rebuild is always picked up)

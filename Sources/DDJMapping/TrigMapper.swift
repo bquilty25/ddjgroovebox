@@ -623,6 +623,98 @@ public final class TrigMapper {
         }
     }
 
+    /// what each page holds (the page buttons' help)
+    static let pageHelp: [TrigPage: String] = [
+        .trig: "the note, velocity, length, retrigs, condition and micro timing",
+        .src: "the sound source: the machine's own controls (BROWSE changes the machine)",
+        .fltr: "the filter and its envelope",
+        .amp: "the volume envelope, pan, level and overdrive",
+        .fx: "the sends to the delay and reverb, chorus, lo-fi, low cut, ducking and width",
+        .lfo: "an LFO that moves one parameter by itself",
+    ]
+
+    /// What a control does now, in a sentence or two: the help line for the control under the mouse (web: main.js;
+    /// the Mac: the tooltip). Knobs: the engine's parameter help, and what turning does now.
+    public func explain(_ c: DDJControl) -> String {
+        switch c {
+        case .pad(let d, let i):
+            switch padFunction(d) {
+            case .steps:
+                return "STEPS: each pad is a step of the active track (left deck 1-8, right deck 9-16; PAGE - / + for the rest). "
+                    + "Tap: on or off. Hold one and turn a knob: that step's own value (a lock); BROWSE: its condition; the jog: its timing."
+            case .keys:
+                return model.machine(track).isMelodic
+                    ? "KEYS: play the active track's notes, low on the left to high on the right. REC (the left CUE) records what you play."
+                    : "KEYS: play the drums, a track on each pad. REC (the left CUE) records what you play."
+            case .tracks:
+                return i < 4
+                    ? "TRACKS: select this track. Hold it and turn BROWSE for a Euclidean rhythm, or the jog to rotate its steps; push BROWSE to roll the dice."
+                    : "Tap: mute or unmute this track. Hold: muted only while held. SHIFT + tap: solo it (again: back as before). SHIFT + hold: solo while held."
+            case .patterns:
+                return "PATTERNS: queue this pattern; it starts when the current one ends. SHIFT + pad: copy the current pattern here."
+            }
+        case .padModeButton:
+            return "The deck's pad mode: HOT CUE = STEPS, BEAT LOOP = KEYS, BEAT JUMP = TRACKS, SAMPLER = PATTERNS. Each deck has its own."
+        case .play: return "PLAY / STOP. SHIFT + PLAY: start again from the top."
+        case .cue(.left): return "REC: records what you play on the KEYS pads into the steps. Press again to stop."
+        case .cue(.right): return "TAP: tap in time to set the tempo. SHIFT + TAP: back to the tempo from before the taps."
+        case .sync(.left):
+            return "FILL: hold to play the fills (steps whose condition is FILL). SHIFT + FILL: AUTOPILOT arranges the pattern in 8-bar phrases (again: off)."
+        case .sync(.right):
+            return "MASTER: the 8 knobs set the master delay, reverb, compressor, DJ filter and volume; BROWSE picks a sound pack."
+        case .loopIn(let d): return pageExplain(d == .left ? .trig : .amp)
+        case .loopOut(let d): return pageExplain(d == .left ? .src : .fx)
+        case .reloop(let d): return pageExplain(d == .left ? .fltr : .lfo)
+        case .callLeft(.left): return "TRK -: the previous track."
+        case .callRight(.left): return "TRK +: the next track."
+        case .callLeft(.right), .callRight(.right):
+            return "PAGE - / +: which 16 steps the pads show, on a track longer than 16. SHIFT + PAGE - / +: the track 16 steps shorter / longer."
+        case .load(let d):
+            if !held.isEmpty {
+                return d == .left ? "SLIDE: the held step slides into the next note." : "ACCENT: the held step is accented: louder and brighter."
+            }
+            return d == .left ? "PAT -: the previous pattern (it starts when this one ends)." : "PAT +: the next pattern (it starts when this one ends)."
+        case .browse, .browsePress:
+            if !heldTrackPads.isEmpty { return "Turn: how many hits, spread evenly over the track (Euclidean). Push: roll the dice." }
+            if !held.isEmpty { return "Turn: the held step's condition: when it plays (ALWAYS, FILL, a chance, 1:4...)." }
+            if page == .src { return "Turn: the active track's machine (KICK, SNARE, HAT, CLAP, TOM, SYNTH, FM, SAMPLE). Push: hear the track." }
+            if page == .master { return "Turn: choose a sound pack (808, 909, KEYS...). Push: load its sounds into this pattern, the steps stay. SHIFT + push: undo." }
+            return "Turn: choose the active track. Push: hear it (AUDITION)."
+        case .headphoneCue(let d):
+            let s = d == .left ? "A" : "B"
+            return "SCENE \(s): hold and turn knobs to store values in scene \(s); SHIFT + press clears it. The crossfader morphs towards it."
+        case .fxSelect: return "FX SELECT: the next beat effect (SHIFT: the previous)."
+        case .beatLeft, .beatRight: return "DIV - / +: the beat effect's length, from 1/32 of a beat up to 4 bars."
+        case .fxOnOff: return "Switches the beat effect on; press again to switch it off."
+        case .fxLevel: return "The beat effect's amount: its feedback, depth or drive. Double-click: 60%."
+        case .fxChannel: return "Where the beat effect goes: deck A (tracks 1-4), deck B (tracks 5-8) or everything (MASTER)."
+        case .trim(let d): return d == .left ? "DRIVE A: saturation on deck A's tracks (1-4)." : "DRIVE B: saturation on deck B's tracks (5-8)."
+        case .channelFader(let d): return d == .left ? "DECK A: the volume of tracks 1-4." : "DECK B: the volume of tracks 5-8."
+        case .crossfader:
+            return "Morphs from scene A (left) through the pattern as written (middle) to scene B (right). Double-click: the middle."
+        case .tempo(.left): return "TEMPO: pull towards you to speed up, as on a DJ deck. It takes over once it reaches the current tempo."
+        case .tempo(.right): return "SWING: delays every second sixteenth (50%: straight; higher: more shuffle)."
+        case .jog, .jogTouch:
+            return "Turn: one of the deck's 4 tracks (the ring). Touch the top and move: scratch the deck. "
+                + "Holding a step: its timing. Holding a track pad: rotates its steps."
+        case .shift: return "SHIFT: hold for each control's second function (written under the buttons)."
+        default:
+            guard let slot = Self.slot(of: c) else { return "Not used by TRIGDECK." }
+            if page == .master { return model.globalHelp(slot: slot) + " Double-click: the default." }
+            let p = param(slot)
+            var out = model.paramHelp(track: track, param: p)
+            if let s = sceneEdit { out += " Turning it now sets scene \(s == 0 ? "A" : "B")'s value." }
+            else if !held.isEmpty { out += " Turning it now locks it on the held step." }
+            else { out += " Hold a step to lock it to that step. Double-click: the default." }
+            if sceneEdit == nil, let badge = knobFace(slot).badge, badge != "LOCK" { out += " The crossfader moves it (scene \(badge))." }
+            return out
+        }
+    }
+
+    private func pageExplain(_ p: TrigPage) -> String {
+        "\(p.name): the 8 coloured knobs show this page for the active track: \(Self.pageHelp[p] ?? "")."
+    }
+
     private func pageFace(_ p: TrigPage) -> ControlFace {
         ControlFace(title: p.name, color: TrigColors.page[p.rawValue], light: page == p ? .on : .off)
     }

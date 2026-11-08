@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!-- The TRIGDECK guide (docs/TRIGDECK.md, the Mac app's Help > TRIGDECK Guide), read and drawn here: headings,
+     paragraphs, numbered and plain lists, tables, bold, code and links are all the guide uses. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TRIGDECK Guide</title>
+<style>
+  @font-face { font-family: "Terminus"; src: url("../Sources/DDJGroovebox/Resources/SLOOPTerminus.ttf"); }
+  :root { color-scheme: dark; }
+  html, body { margin: 0; background: #0B0B0E; color: #d8d8dc; font-family: "Terminus", monospace; font-size: 15px; line-height: 1.6; }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 12px; color: #fff; }
+  h2 { font-size: 19px; margin: 32px 0 8px; color: #7CDB3C; border-bottom: 1px solid #26262c; padding-bottom: 4px; }
+  h3 { font-size: 16px; margin: 20px 0 6px; color: #fff; }
+  p, li { max-width: 80ch; }
+  strong { color: #fff; }
+  code { background: #17171c; padding: 1px 5px; border: 1px solid #2a2a31; }
+  a { color: #4FA3FF; }
+  table { border-collapse: collapse; margin: 10px 0 18px; width: 100%; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 10px; border-bottom: 1px solid #23232a; }
+  th { color: #8a8a94; font-weight: normal; }
+  td:first-child { white-space: nowrap; color: #fff; }
+  .top { display: flex; justify-content: space-between; align-items: center; color: #888; font-size: 13px; margin-bottom: 18px; }
+  @media (max-width: 640px) { td:first-child { white-space: normal; } table { font-size: 13px; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><span>TRIGDECK</span><a href="./">back to TRIGDECK</a></div>
+  <div id="guide">loading the guide…</div>
+</main>
+<script type="module">
+const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const inline = (s) => esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+/** the guide's Markdown as HTML (the few forms it uses) */
+function render(md) {
+    const lines = md.replace(/\r/g, "").split("\n"), out = [];
+    let i = 0;
+    while (i < lines.length) {
+        const l = lines[i];
+        if (!l.trim()) { i++; continue; }
+        const h = /^(#{1,3}) (.*)$/.exec(l);
+        if (h) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); i++; continue; }
+        if (l.startsWith("|")) {                                  // a table: a header row, a --- row, the rows
+            const rows = [];
+            while (i < lines.length && lines[i].startsWith("|")) rows.push(lines[i++]);
+            const cells = (r) => r.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+            const body = rows.filter((r, k) => k !== 1 || !/^\|[\s:|-]+\|?$/.test(r));
+            const [head, ...rest] = body;
+            out.push("<table><thead><tr>" + cells(head).map((c) => `<th>${inline(c)}</th>`).join("") + "</tr></thead><tbody>"
+                     + rest.map((r) => "<tr>" + cells(r).map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>").join("")
+                     + "</tbody></table>");
+            continue;
+        }
+        const item = /^(\d+\.|-|\*) (.*)$/.exec(l);
+        if (item) {                                               // a list; indented lines continue an item
+            const ordered = /\d/.test(item[1]), items = [];
+            while (i < lines.length) {
+                const m = /^(\d+\.|-|\*) (.*)$/.exec(lines[i]);
+                if (m) { items.push(m[2]); i++; }
+                else if (/^\s+\S/.test(lines[i]) && items.length) { items[items.length - 1] += " " + lines[i].trim(); i++; }
+                else break;
+            }
+            const tag = ordered ? "ol" : "ul";
+            out.push(`<${tag}>` + items.map((t) => `<li>${inline(t)}</li>`).join("") + `</${tag}>`);
+            continue;
+        }
+        const para = [];                                          // a paragraph: until a blank line or another form
+        while (i < lines.length && lines[i].trim() && !/^(#{1,3} |\||\d+\. |- |\* )/.test(lines[i])) para.push(lines[i++].trim());
+        out.push(`<p>${inline(para.join(" "))}</p>`);
+    }
+    return out.join("\n");
+}
+
+const el = document.getElementById("guide");
+try {
+    const r = await fetch("../docs/TRIGDECK.md", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status + " " + r.statusText);
+    el.innerHTML = render(await r.text());
+} catch (err) {
+    el.textContent = "The guide could not be loaded (" + err.message + "). It is docs/TRIGDECK.md in the project.";
+}
+</script>
+</body>
+</html>

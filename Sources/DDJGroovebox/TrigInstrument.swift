@@ -97,7 +97,8 @@ final class TrigInstrument: Instrument {
 
     func help(for c: DDJControl) -> String? {
         guard let f = mapper.face(c) else { return nil }
-        return [f.title, f.value].compactMap { $0 }.joined(separator: ": ")
+        // the tooltip: the control's face, then what it does now (the help line)
+        return [f.title, f.value].compactMap { $0 }.joined(separator: ": ") + "\n" + mapper.explain(c)
     }
 
     func connectionChanged(_ connected: Bool) {

@@ -48,9 +48,22 @@ function handle(e) {
 }
 strip.onSelectTrack = (t) => { if (mapper) { force = true; engine.apply(mapper.select(t)); } };
 ddj.onReset((c) => { if (mapper) { force = true; engine.apply(mapper.reset(c)); } });   // (a double-click on a knob)
+// the help line in the bar: what the control under the mouse does now (kept up to date while it stays there)
+let hovered = null;
+const helpline = $("helpline");
+function showHelp() {
+    if (!hovered || !mapper) { helpline.textContent = "point at any control to see what it does"; helpline.title = ""; return; }
+    const f = mapper.face(hovered), name = f ? [f.title, f.value].filter(Boolean).join(" ") : "";
+    const text = mapper.explain(hovered);
+    helpline.innerHTML = "";
+    if (name) { const b = document.createElement("b"); b.textContent = name + ": "; helpline.append(b); }
+    helpline.append(text);
+    helpline.title = (name ? name + ": " : "") + text;          // (the whole text, when the line is too narrow)
+}
+ddj.onHover((c) => { hovered = c; showHelp(); });
 ddj.helpText = (c) => {
     const f = mapper?.face(c);
-    return f ? [f.title, f.value].filter(Boolean).join(": ") : null;
+    return f ? [f.title, f.value].filter(Boolean).join(": ") + (mapper ? "\n" + mapper.explain(c) : "") : null;
 };
 
 /** every parameter the pattern's scenes hold: its name, range, scene A's and B's values (or null), its written value */
@@ -74,6 +87,7 @@ function update() {
     if (!mapper) { requestAnimationFrame(update); return; }
     engine.apply(mapper.tick());
     frame++;
+    if (hovered && (frame % 6 === 0 || force)) showHelp();     // (it follows a held step, a page change...)
     if (frame % 3 === 0 || force) {
         force = false;
         const faces = new Map();

@@ -76,6 +76,8 @@ const char *td_page_name(int page);                      /* "TRIG", "SRC", ... ;
 int td_param_info(int track, int param, td_param_info_t *out);   /* depends on the track's machine; 0 if no parameter there */
 int td_global_info(int slot, td_param_info_t *out);      /* the MASTER page's 8 parameters */
 int td_format_value(const td_param_info_t *info, int value, char *out, int n);   /* "1.2 kHz", "-12", "1/16" */
+const char *td_param_help(int machine, int param);       /* what it does, one or two sentences ("" for none) */
+const char *td_global_help(int slot);                    /* the same for the MASTER page's 8 */
 const char *td_cond_name(int cond);                      /* "ALWAYS", "FILL", "50%", "1:2" ... */
 const char *td_perf_name(int perf);                      /* "REPEAT" ... */
 

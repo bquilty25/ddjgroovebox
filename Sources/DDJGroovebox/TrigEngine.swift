@@ -44,6 +44,10 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
     var recording: Bool { state.recording != 0 }
     var pattern: Int { Int(state.pattern) }
     func patternName(_ p: Int) -> String { String(cString: td_pattern_name(Int32(p))) }
+    func paramHelp(track: Int, param: Int) -> String {
+        String(cString: td_param_help(Int32(machine(track).rawValue), Int32(param)))
+    }
+    func globalHelp(slot: Int) -> String { String(cString: td_global_help(Int32(slot))) }
     var queuedPattern: Int? { state.queued_pattern >= 0 && state.queued_pattern != state.pattern ? Int(state.queued_pattern) : nil }
     var bpm: Double { Double(state.bpm) }
     var swing: Int { Int(state.swing) }

@@ -1143,6 +1143,12 @@ TEST(test_default_project)
     int tok = 1;
     for (int p = 0; p < 16; p++) tok &= E.pat[p].bpm10 == tempos[p] * 10;
     check("each pattern has its tempo (house ~124, techno ~130, garage 132-138, drum & bass 165-174)", tok);
+    int helpMissing = 0;
+    for (int mm = 0; mm < TD_MACHINES; mm++)
+        for (int q = 0; q < TD_NPARAMS; q++) helpMissing += !*td_param_help(mm, q);
+    for (int s = 0; s < TD_SLOTS; s++) helpMissing += !*td_global_help(s);
+    check("every parameter has its help (DECAY: the source's own on SRC, the envelope's on AMP)", !helpMissing
+          && strcmp(td_param_help(TD_M_KICK, P_SRC + KK_DECAY), td_param_help(TD_M_KICK, P_ADEC)) != 0);
     check("each pattern has its name (P01 DEEP, P07 DUBSPACE, P12 HAZE)", !strcmp(td_pattern_name(0), "DEEP")
           && !strcmp(td_pattern_name(6), "DUBSPACE") && !strcmp(td_pattern_name(11), "HAZE") && !strcmp(td_pattern_name(16), ""));
     int dnb = 1;                                               /* the two-step: kick on 1 and the "and" of 3, snare 2 and 4 */

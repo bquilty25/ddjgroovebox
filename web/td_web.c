@@ -116,6 +116,8 @@ EXPORT(tdw_info) td_param_info_t *tdw_info(int machine, int param)
     return td_param_info(0, param, &g_info) ? &g_info : 0;
 }
 EXPORT(tdw_ginfo) td_param_info_t *tdw_ginfo(int slot) { return td_global_info(slot, &g_info) ? &g_info : 0; }
+EXPORT(tdw_param_help) const char *tdw_param_help(int machine, int param) { return td_param_help(machine, param); }
+EXPORT(tdw_global_help) const char *tdw_global_help(int slot) { return td_global_help(slot); }
 EXPORT(tdw_format) char *tdw_format(int machine, int param, int value)
 {
     if (!tdw_info(machine, param)) return 0;

@@ -13,6 +13,8 @@ class FakeTrig {
     playing = false; recording = false; pattern = 0;
     queuedPattern = null;
     patternName(p) { return p === 0 ? "DEEP" : ""; }
+    paramHelp(track, param) { return `PARAM ${param} HELP.`; }
+    globalHelp(slot) { return `GLOBAL ${slot} HELP.`; }
     bpm = 120; swing = 50;
     autopilot = false;
     machines = [MACHINE.kick, MACHINE.snare, MACHINE.hat, MACHINE.clap, MACHINE.synth, MACHINE.fm, MACHINE.sample,
@@ -184,6 +186,23 @@ test("pattern pads show the names", () => {
     assert.equal(m.face(C.pad(0, 0)).title, "DEEP");
     assert.equal(m.face(C.pad(0, 0)).value, "P01");
     assert.equal(m.face(C.pad(0, 1)).title, "P02");
+});
+
+test("explain says what each control does", () => {
+    const { m, model, send } = setUp();
+    const controls = [C.play(0), C.cue(0), C.cue(1), C.sync(0), C.sync(1), C.loopIn(0), C.callLeft(0), C.callRight(1), C.load(0),
+                      C.browse, C.headphoneCue(0), C.fxSelect, C.fxOnOff, C.fxLevel, C.trim(0), C.channelFader(1), C.crossfader,
+                      C.tempo(0), C.tempo(1), C.jog(0), C.shift(0), C.pad(0, 0), C.pad(1, 5), C.eqHi(0), C.cfx(1)];
+    for (const c of controls) {
+        const e = m.explain(c);
+        assert.ok(e.length > 0, c);
+        assert.notEqual(e, "Not used by TRIGDECK.", c);
+    }
+    const p = m.page * 8;
+    assert.ok(m.explain(C.eqHi(0)).startsWith(model.paramHelp(0, p)), "a knob: its parameter's help first");
+    send(C.pad(0, 2), press(true), { mode: "hotCue" });
+    assert.ok(m.explain(C.eqHi(0)).includes("locks it on the held step"), "what turning does now");
+    assert.ok(m.explain(C.load(0)).startsWith("SLIDE"));
 });
 
 test("a double-click resets a knob to its default", () => {

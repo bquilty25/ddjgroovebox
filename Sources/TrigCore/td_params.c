@@ -360,6 +360,133 @@ const char *td_page_name(int page)
     return page >= 0 && page < TD_PAGES ? N[page] : "";
 }
 const char *td_cond_name(int cond) { return cond >= 0 && cond < TD_CONDS ? COND_NAMES[cond] : ""; }
+
+/* ---- what each parameter does, for the help line (by page and name; a machine's own first, then any machine's) */
+typedef struct { int8_t page, machine; const char *name, *text; } help_t;
+#define ANY -1
+static const help_t HELP[] = {
+    /* TRIG */
+    {0, ANY, "NOTE", "The note the track plays. Hold a step and turn: that step's own note."},
+    {0, ANY, "VELOCITY", "How hard the note is hit: louder, and brighter on most machines."},
+    {0, ANY, "LENGTH", "How long the note is held, in steps (INF: until the next note)."},
+    {0, ANY, "RETRIG", "Repeats the note inside its step: rolls and stutters. 0: off."},
+    {0, ANY, "RTRG RATE", "How fast the repeats come: 1/16 up to 1/64."},
+    {0, ANY, "RTRG VEL", "The repeats get louder (+) or fade away (-)."},
+    {0, ANY, "COND", "When the step plays: ALWAYS; FILL (only while FILL is held); 1ST; a chance (12% to 87%); or A:B, the "
+                     "Ath pass in every B (1:4 plays once every 4 bars)."},
+    {0, ANY, "MICRO", "Moves the note a little early (-) or late (+), in 24ths of a step: the feel."},
+    /* SRC: every machine */
+    {1, ANY, "TUNE", "The pitch, up or down in semitones."},
+    {1, ANY, "DECAY", "How long the sound rings out."},
+    {1, ANY, "DRIVE", "Saturation: warmer and louder, then distorted."},
+    {1, ANY, "TONE", "The sound's brightness."},
+    {1, ANY, "NOISE", "Noise mixed into the sound."},
+    {1, ANY, "CHORD", "Plays a chord from each note: MIN7, MAJ7, MIN9, SUS4..."},
+    /* SRC: per machine */
+    {1, TD_M_KICK, "SWEEP", "How far the pitch falls at the start: the kick's punch."},
+    {1, TD_M_KICK, "SWTIME", "How quickly that pitch fall happens."},
+    {1, TD_M_KICK, "CLICK", "The click at the start, which helps a kick cut through."},
+    {1, TD_M_KICK, "HOLD", "Keeps the body at full level before it decays: a longer, boomier kick."},
+    {1, TD_M_SNARE, "NOISE", "The snares: noise against the drum's body."},
+    {1, TD_M_SNARE, "NDECAY", "How long the snares (the noise) ring."},
+    {1, TD_M_SNARE, "SNAP", "The crack at the start."},
+    {1, TD_M_SNARE, "BODY", "The drum's own tone under the snares."},
+    {1, TD_M_HAT, "OPEN", "Closed to open: lets the hat ring."},
+    {1, TD_M_HAT, "COLOR", "The metal's character, darker to brighter."},
+    {1, TD_M_HAT, "BRIGHT", "How much top end."},
+    {1, TD_M_HAT, "RESO", "A ringing resonance in the metal."},
+    {1, TD_M_HAT, "SPREAD", "Spreads the metal's tones apart: wider, trashier."},
+    {1, TD_M_CLAP, "SPREAD", "The time between the clap's hands."},
+    {1, TD_M_CLAP, "BURSTS", "How many hands clap."},
+    {1, TD_M_CLAP, "ROOM", "A short room around the clap."},
+    {1, TD_M_CLAP, "RAND", "Random timing between the hands: looser."},
+    {1, TD_M_TOM, "SWEEP", "How far the pitch falls at the start."},
+    {1, TD_M_TOM, "SWTIME", "How quickly that pitch fall happens."},
+    {1, TD_M_TOM, "FM", "A metallic FM tone in the drum."},
+    {1, TD_M_SYNTH, "SHAPE", "The wave: sine, triangle, saw, square, and blends between them."},
+    {1, TD_M_SYNTH, "DETUNE", "A second oscillator slightly out of tune: thicker and wider."},
+    {1, TD_M_SYNTH, "INTVL", "The second oscillator's interval in semitones (7: a fifth, 12: an octave)."},
+    {1, TD_M_SYNTH, "SUB", "A sine an octave below: weight."},
+    {1, TD_M_SYNTH, "NOISE", "Noise mixed in: breath and air."},
+    {1, TD_M_SYNTH, "GLIDE", "Slides from one note to the next."},
+    {1, TD_M_FM, "RATIO", "The modulator's pitch against the note: 1 is warm, higher ratios are bells and metal."},
+    {1, TD_M_FM, "INDEX", "How much modulation: brighter, then harsher."},
+    {1, TD_M_FM, "FDBK", "The modulator feeds back on itself: grit, then noise."},
+    {1, TD_M_FM, "ENVDEC", "How fast the modulation dies away: short makes a pluck or an electric piano's tine."},
+    {1, TD_M_FM, "ENVAMT", "How much that envelope adds to the modulation."},
+    {1, TD_M_FM, "FINE", "Fine-tunes the ratio: beating, bell-like detune."},
+    {1, TD_M_SAMPLE, "SLOT", "Which sample plays (the sound packs fill the slots)."},
+    {1, TD_M_SAMPLE, "START", "Where in the sample it starts."},
+    {1, TD_M_SAMPLE, "END", "Where in the sample it stops."},
+    {1, TD_M_SAMPLE, "SLICES", "Cuts the sample into 4, 8 or 16 slices: the note picks the slice."},
+    {1, TD_M_SAMPLE, "REVERSE", "Plays the sample backwards."},
+    {1, TD_M_SAMPLE, "LOOP", "Loops the sample while the note lasts."},
+    {1, TD_M_SAMPLE, "GAIN", "The sample's level before the filter."},
+    /* FLTR */
+    {2, ANY, "CUTOFF", "The filter's cutoff. Low-pass: lower is darker. High-pass: higher is thinner."},
+    {2, ANY, "RESO", "A peak at the cutoff, from smooth to squelchy. Heard only when the cutoff is inside the sound."},
+    {2, ANY, "TYPE", "LP keeps the lows, BP the middle, HP the highs."},
+    {2, ANY, "ENV", "How far each note opens (+) or closes (-) the filter: a pluck or a wah. At 0, ATTACK and DECAY do nothing."},
+    {2, ANY, "ATTACK", "How fast the filter envelope opens (needs ENV)."},
+    {2, ANY, "DECAY", "How fast the filter envelope closes again (needs ENV)."},
+    {2, ANY, "KEYTRK", "Higher notes open the filter more, so they are not duller than low ones."},
+    {2, ANY, "DRIVE", "Overdrives the filter: fatter, grittier."},
+    /* AMP */
+    {3, ANY, "ATTACK", "Each note's fade-in: 0 is a sharp start, higher for pads and swells."},
+    {3, ANY, "HOLD", "Stays at full level before the decay starts."},
+    {3, ANY, "DECAY", "How fast the level falls to SUSTAIN."},
+    {3, ANY, "SUSTAIN", "The level held while the note lasts (0: the note dies away by itself)."},
+    {3, ANY, "RELEASE", "The fade-out after the note ends."},
+    {3, ANY, "PAN", "Left or right."},
+    {3, ANY, "LEVEL", "The track's volume."},
+    {3, ANY, "OVERDRIVE", "Distortion after the envelope: louder and dirtier."},
+    /* FX */
+    {4, ANY, "DELAY", "How much goes into the master delay (its time and echoes are on the MASTER page)."},
+    {4, ANY, "REVERB", "How much goes into the master reverb (its size is on the MASTER page)."},
+    {4, ANY, "CHORUS", "A chorus: wider and wobblier."},
+    {4, ANY, "BITS", "Fewer bits: crunchy lo-fi."},
+    {4, ANY, "SRR", "A lower sample rate: aliased, metallic lo-fi."},
+    {4, ANY, "LOWCUT", "Cuts the lows: keeps hats, chords and stabs out of the kick's and bass's way."},
+    {4, ANY, "DUCK", "Ducks the track under the kick (sidechain): house music's pumping."},
+    {4, ANY, "WIDTH", "Stereo width."},
+    /* LFO */
+    {5, ANY, "SPEED", "How fast the LFO moves (MULT multiplies it, in time with the tempo)."},
+    {5, ANY, "MULT", "Multiplies SPEED, in time with the tempo."},
+    {5, ANY, "WAVE", "The LFO's shape: sine, triangle, saw, square or random."},
+    {5, ANY, "DEST", "What the LFO moves: a SRC parameter, CUTOFF, PAN, DELAY... OFF: nothing."},
+    {5, ANY, "DEPTH", "How far the LFO moves its destination, up (+) or down (-). At 0 it moves nothing."},
+    {5, ANY, "FADE", "Fades the LFO in (+) or out (-) after each note."},
+    {5, ANY, "MODE", "FREE runs on; TRIG restarts with each note; HOLD freezes at each note; ONE runs once per note."},
+    {5, ANY, "PHASE", "Where in its wave the LFO starts."},
+    /* MASTER (td_global_help) */
+    {6, ANY, "DLY TIME", "The master delay's time, in steps of the tempo (3/16 is the classic dub echo)."},
+    {6, ANY, "DLY FDBK", "How many echoes: higher repeats for longer."},
+    {6, ANY, "DLY TONE", "Darker or brighter echoes."},
+    {6, ANY, "REV SIZE", "The reverb's size, from a room to a hall."},
+    {6, ANY, "REV DAMP", "Damps the reverb's highs: darker."},
+    {6, ANY, "COMP", "A compressor on everything: glues the mix, louder and more even."},
+    {6, ANY, "FILTER", "A DJ filter on everything: left is low-pass, right is high-pass, the middle is off."},
+    {6, ANY, "VOLUME", "The master volume."},
+};
+
+static const char *help_for(int page, int machine, const char *name)
+{
+    const char *any = "";
+    for (size_t i = 0; i < sizeof HELP / sizeof HELP[0]; i++) {
+        const help_t *h = &HELP[i];
+        if (h->page != page || strcmp(h->name, name) != 0) continue;
+        if (h->machine == machine) return h->text;
+        if (h->machine == ANY) any = h->text;
+    }
+    return any;
+}
+const char *td_param_help(int machine, int param)
+{
+    if (param < 0 || param >= TD_NPARAMS) return "";
+    machine = clampi(machine, 0, TD_MACHINES - 1);
+    return help_for(param / TD_SLOTS, machine, td_pdesc(machine, param)->name);
+}
+const char *td_global_help(int slot) { return help_for(6, ANY, td_gdesc(slot)->name); }
 const char *td_perf_name(int perf)
 {
     static const char *const N[TD_PERFS] = {"REPEAT", "STUTTER", "TAPESTOP", "DLYTHROW", "REVTHROW", "FILTER", "CRUSH",

@@ -12,7 +12,10 @@
   #bar { display: flex; gap: 10px; align-items: center; height: 30px; padding: 0 12px; font-size: 12px; color: #888; }
   #bar button, #bar label { font: inherit; background: #15151a; color: #ccc; border: 1px solid #333; padding: 3px 10px; cursor: pointer; }
   #bar input { display: none; }
-  #status { margin-left: auto; }
+  #help { font: inherit; background: #15151a; color: #7CDB3C; border: 1px solid #7CDB3C; padding: 3px 10px; text-decoration: none; }
+  #helpline { flex: 1; min-width: 0; color: #cfcfd6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #helpline b { color: #7CDB3C; font-weight: normal; }
+  #status { margin-left: auto; flex: none; }
   #app { position: absolute; top: 30px; left: 0; right: 0; bottom: 0; }
   #overlay { position: absolute; inset: 30px 0 0 0; display: grid; place-items: center; background: rgba(0,0,0,0.72); z-index: 2; }
   #overlay div { text-align: center; line-height: 1.7; }
@@ -26,6 +29,8 @@
   <button id="export" title="download the project">EXPORT</button>
   <label title="load a trigdeck.project file">IMPORT<input id="import" type="file" accept=".project"></label>
   <button id="forget" title="forget the project saved in this browser">FORGET</button>
+  <a id="help" href="help.html" target="_blank" title="the TRIGDECK guide (opens in a new tab)">HELP</a>
+  <span id="helpline">point at any control to see what it does</span>
   <span id="status">press START</span>
 </div>
 <div id="app"></div>
@@ -33,7 +38,8 @@
   <button id="start">START</button><br>
   Browsers start audio after a click. A DDJ-400 or DDJ-FLX4 plays it over Web MIDI: allow MIDI when asked<br>
   (Firefox asks once to add a small "site permission" add-on for this page: that is its MIDI permission).<br>
-  The mouse and the keyboard play it too, with the Mac app's keys (1-8 and Q-I the pads, space PLAY, A S D F / J K L ;).
+  The mouse and the keyboard play it too, with the Mac app's keys (1-8 and Q-I the pads, space PLAY, A S D F / J K L ;).<br>
+  Hover over any control to see what it does. HELP (top left) opens the full guide.
 </div></div>
 <script type="module" src="src/main.js"></script>
 </body>

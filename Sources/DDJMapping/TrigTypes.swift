@@ -79,6 +79,9 @@ public protocol TrigModel: AnyObject {
     var pattern: Int { get }
     /// a pattern's name ("DEEP"; "" without one)
     func patternName(_ p: Int) -> String
+    /// what a parameter does (the help line), for the track's machine; the MASTER page's by slot
+    func paramHelp(track: Int, param: Int) -> String
+    func globalHelp(slot: Int) -> String
     var queuedPattern: Int? { get }
     var bpm: Double { get }
     var swing: Int { get }

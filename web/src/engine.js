@@ -204,6 +204,9 @@ export class TrigWebEngine {
         return null;
     }
     condName(c) { return cString(this.helper, this.helper.tdw_cond_name(c)); }
+    /** what a parameter does (the help line), for the track's machine; the MASTER page's by slot */
+    paramHelp(track, param) { return cString(this.helper, this.helper.tdw_param_help(this.machine(track), param)); }
+    globalHelp(slot) { return cString(this.helper, this.helper.tdw_global_help(slot)); }
     machineName(m) { return cString(this.helper, this.helper.tdw_machine_name(m)); }
 }
 

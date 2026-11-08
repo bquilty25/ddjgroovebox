@@ -7,6 +7,8 @@ final class FakeTrig: TrigModel {
     var playing = false, recording = false, pattern = 0
     var queuedPattern: Int?
     func patternName(_ p: Int) -> String { p == 0 ? "DEEP" : "" }
+    func paramHelp(track: Int, param: Int) -> String { "PARAM \(param) HELP." }
+    func globalHelp(slot: Int) -> String { "GLOBAL \(slot) HELP." }
     var bpm = 120.0, swing = 50
     var autopilot = false
     var machines: [Machine] = [.kick, .snare, .hat, .clap, .synth, .fm, .sample, .tom]
@@ -168,6 +170,24 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.face(.pad(.left, 0))?.title, "DEEP")
         XCTAssertEqual(m.face(.pad(.left, 0))?.value, "P01")
         XCTAssertEqual(m.face(.pad(.left, 1))?.title, "P02", "no name: the number")
+    }
+
+    func testExplainSaysWhatEachControlDoes() {
+        let controls: [DDJControl] = [.play(.left), .cue(.left), .cue(.right), .sync(.left), .sync(.right), .loopIn(.left),
+                                      .callLeft(.left), .callRight(.right), .load(.left), .browse, .headphoneCue(.left),
+                                      .fxSelect, .fxOnOff, .fxLevel, .trim(.left), .channelFader(.right), .crossfader,
+                                      .tempo(.left), .tempo(.right), .jog(.left), .shift(.left), .pad(.left, 0), .pad(.right, 5),
+                                      .eqHi(.left), .cfx(.right)]
+        for c in controls {
+            let e = m.explain(c)
+            XCTAssertFalse(e.isEmpty, "\(c)")
+            XCTAssertNotEqual(e, "Not used by TRIGDECK.", "\(c)")
+        }
+        let p = m.page.rawValue * 8
+        XCTAssertTrue(m.explain(.eqHi(.left)).hasPrefix(model.paramHelp(track: 0, param: p)), "a knob: its parameter's help first")
+        send(.pad(.left, 2), .press(true), mode: .hotCue)
+        XCTAssertTrue(m.explain(.eqHi(.left)).contains("locks it on the held step"), "what turning does now")
+        XCTAssertTrue(m.explain(.load(.left)).hasPrefix("SLIDE"))
     }
 
     func testResetToDefault() {

@@ -771,6 +771,96 @@ export class TrigMapper {
         return face(TRIG_PAGES[p], { color: COLORS.page[p], light: this.page === p ? ON : OFF });
     }
 
+    /** What a control does now, in a sentence or two: the help line for the control under the mouse (Swift's
+     *  explain). Knobs: the engine's parameter help, and what turning does now. */
+    explain(c) {
+        const model = this.model, pc = parseControl(c), d = pc.deck;
+        const held = this.#held.size > 0;
+        switch (pc.kind) {
+        case "pad":
+            switch (padFunctionOf(this.padMode(d))) {
+            case "steps":
+                return "STEPS: each pad is a step of the active track (left deck 1-8, right deck 9-16; PAGE - / + for the rest). "
+                    + "Tap: on or off. Hold one and turn a knob: that step's own value (a lock); BROWSE: its condition; the jog: its timing.";
+            case "keys":
+                return isMelodic(model.machine(this.track))
+                    ? "KEYS: play the active track's notes, low on the left to high on the right. REC (the left CUE) records what you play."
+                    : "KEYS: play the drums, a track on each pad. REC (the left CUE) records what you play.";
+            case "tracks":
+                return pc.index < 4
+                    ? "TRACKS: select this track. Hold it and turn BROWSE for a Euclidean rhythm, or the jog to rotate its steps; push BROWSE to roll the dice."
+                    : "Tap: mute or unmute this track. Hold: muted only while held. SHIFT + tap: solo it (again: back as before). SHIFT + hold: solo while held.";
+            default:
+                return "PATTERNS: queue this pattern; it starts when the current one ends. SHIFT + pad: copy the current pattern here.";
+            }
+        case "padModeButton":
+            return "The deck's pad mode: HOT CUE = STEPS, BEAT LOOP = KEYS, BEAT JUMP = TRACKS, SAMPLER = PATTERNS. Each deck has its own.";
+        case "play": return "PLAY / STOP. SHIFT + PLAY: start again from the top.";
+        case "cue":
+            return d === 0 ? "REC: records what you play on the KEYS pads into the steps. Press again to stop."
+                           : "TAP: tap in time to set the tempo. SHIFT + TAP: back to the tempo from before the taps.";
+        case "sync":
+            return d === 0
+                ? "FILL: hold to play the fills (steps whose condition is FILL). SHIFT + FILL: AUTOPILOT arranges the pattern in 8-bar phrases (again: off)."
+                : "MASTER: the 8 knobs set the master delay, reverb, compressor, DJ filter and volume; BROWSE picks a sound pack.";
+        case "loopIn": return this.#pageExplain(d === 0 ? PAGE.trig : PAGE.amp);
+        case "loopOut": return this.#pageExplain(d === 0 ? PAGE.src : PAGE.fx);
+        case "reloop": return this.#pageExplain(d === 0 ? PAGE.fltr : PAGE.lfo);
+        case "callLeft": case "callRight":
+            if (d === 0) return pc.kind === "callLeft" ? "TRK -: the previous track." : "TRK +: the next track.";
+            return "PAGE - / +: which 16 steps the pads show, on a track longer than 16. SHIFT + PAGE - / +: the track 16 steps shorter / longer.";
+        case "load":
+            if (held) return d === 0 ? "SLIDE: the held step slides into the next note." : "ACCENT: the held step is accented: louder and brighter.";
+            return d === 0 ? "PAT -: the previous pattern (it starts when this one ends)." : "PAT +: the next pattern (it starts when this one ends).";
+        case "browse": case "browsePress":
+            if (this.#heldTrackPads.size > 0) return "Turn: how many hits, spread evenly over the track (Euclidean). Push: roll the dice.";
+            if (held) return "Turn: the held step's condition: when it plays (ALWAYS, FILL, a chance, 1:4...).";
+            if (this.page === PAGE.src) return "Turn: the active track's machine (KICK, SNARE, HAT, CLAP, TOM, SYNTH, FM, SAMPLE). Push: hear the track.";
+            if (this.page === PAGE.master) return "Turn: choose a sound pack (808, 909, KEYS...). Push: load its sounds into this pattern, the steps stay. SHIFT + push: undo.";
+            return "Turn: choose the active track. Push: hear it (AUDITION).";
+        case "headphoneCue": {
+            const s = d === 0 ? "A" : "B";
+            return `SCENE ${s}: hold and turn knobs to store values in scene ${s}; SHIFT + press clears it. The crossfader morphs towards it.`;
+        }
+        case "fxSelect": return "FX SELECT: the next beat effect (SHIFT: the previous).";
+        case "beatLeft": case "beatRight": return "DIV - / +: the beat effect's length, from 1/32 of a beat up to 4 bars.";
+        case "fxOnOff": return "Switches the beat effect on; press again to switch it off.";
+        case "fxLevel": return "The beat effect's amount: its feedback, depth or drive. Double-click: 60%.";
+        case "fxChannel": return "Where the beat effect goes: deck A (tracks 1-4), deck B (tracks 5-8) or everything (MASTER).";
+        case "trim": return d === 0 ? "DRIVE A: saturation on deck A's tracks (1-4)." : "DRIVE B: saturation on deck B's tracks (5-8).";
+        case "channelFader": return d === 0 ? "DECK A: the volume of tracks 1-4." : "DECK B: the volume of tracks 5-8.";
+        case "crossfader": return "Morphs from scene A (left) through the pattern as written (middle) to scene B (right). Double-click: the middle.";
+        case "tempo":
+            return d === 0 ? "TEMPO: pull towards you to speed up, as on a DJ deck. It takes over once it reaches the current tempo."
+                           : "SWING: delays every second sixteenth (50%: straight; higher: more shuffle).";
+        case "jog": case "jogTouch":
+            return "Turn: one of the deck's 4 tracks (the ring). Touch the top and move: scratch the deck. "
+                + "Holding a step: its timing. Holding a track pad: rotates its steps.";
+        case "shift": return "SHIFT: hold for each control's second function (written under the buttons).";
+        default: {
+            const slot = TrigMapper.slot(c);
+            if (slot === null || slot === undefined) return "Not used by TRIGDECK.";
+            if (this.page === PAGE.master) return model.globalHelp(slot) + " Double-click: the default.";
+            let out = model.paramHelp(this.track, this.param(slot));
+            if (this.sceneEdit !== null) out += ` Turning it now sets scene ${this.sceneEdit === 0 ? "A" : "B"}'s value.`;
+            else if (held) out += " Turning it now locks it on the held step.";
+            else out += " Hold a step to lock it to that step. Double-click: the default.";
+            const badge = this.knobFace(slot).badge;
+            if (this.sceneEdit === null && badge && badge !== "LOCK") out += ` The crossfader moves it (scene ${badge}).`;
+            return out;
+        }
+        }
+    }
+
+    #pageExplain(p) {
+        const what = ["the note, velocity, length, retrigs, condition and micro timing",
+                      "the sound source: the machine's own controls (BROWSE changes the machine)",
+                      "the filter and its envelope", "the volume envelope, pan, level and overdrive",
+                      "the sends to the delay and reverb, chorus, lo-fi, low cut, ducking and width",
+                      "an LFO that moves one parameter by itself"][p] ?? "";
+        return `${TRIG_PAGES[p]}: the 8 coloured knobs show this page for the active track: ${what}.`;
+    }
+
     knobFace(slot) {
         const model = this.model, track = this.track;
         const color = COLORS.knobRow[slot % 4];

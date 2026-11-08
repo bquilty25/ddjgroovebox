@@ -35,8 +35,12 @@ private func render(_ frames: Int, chunk: Int = 512) -> [Float] {
 }
 private func emptyPattern(bpm: Float = 120) {
     td_init()
-    td_pattern_queue(12)                                       // P13: P01's sounds, no steps
-    td_set_tempo(bpm)
+    for p: Int32 in [15, 14, 13, 12] {                         // P13..P16 made empty for the tests: P01's sounds,
+        td_pattern_copy(0, p)                                  // no steps, the test's tempo
+        td_pattern_clear(p)
+        td_pattern_queue(p)
+        td_set_tempo(bpm)
+    }
     td_set_swing(50)
     td_midi_config(0, 1)
 }

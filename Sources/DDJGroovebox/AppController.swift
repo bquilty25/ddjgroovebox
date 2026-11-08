@@ -308,7 +308,17 @@ final class AppController: NSObject, NSWindowDelegate {
             (1.9, DDJEvent(.pad(.right, 1), .press(false), padMode: .beatJump)),
             (2.2, DDJEvent(.crossfader, .absolute(0.3))),
         ]
-        let script: [(Double, DDJEvent)] = instrument is TrigInstrument ? trig : [
+        let packs: [(Double, DDJEvent)] = [                                     // DDJ_PACKS: the pack browser
+            (0.3, DDJEvent(.play(.left), .press(true))),
+            (0.4, DDJEvent(.play(.left), .press(false))),
+            (0.6, DDJEvent(.sync(.right), .press(true))),                       // the MASTER page
+            (0.7, DDJEvent(.sync(.right), .press(false))),
+            (2.6, DDJEvent(.browse, .relative(1))),                             // 909
+            (3.0, DDJEvent(.browsePress, .press(true))),                        // load it
+            (3.1, DDJEvent(.browsePress, .press(false))),
+        ]
+        let trigScript = ProcessInfo.processInfo.environment["DDJ_PACKS"] != nil ? packs : trig
+        let script: [(Double, DDJEvent)] = instrument is TrigInstrument ? trigScript : [
             (0.5, DDJEvent(.pad(.right, 7), .press(true), padMode: .sampler)),
             (0.6, DDJEvent(.pad(.right, 7), .press(false), padMode: .sampler)),
             (0.8, DDJEvent(.sync(.left), .press(true))),

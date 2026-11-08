@@ -30,6 +30,7 @@ final class FakeTrig: TrigModel {
     func value(track: Int, param: Int) -> Int { values[track * 100 + param] ?? 64 }
     func liveValue(track: Int, param: Int) -> Int { value(track: track, param: param) }
     func globalValue(slot: Int) -> Int { globals[slot] ?? 50 }
+    var packNames: [String] { ["808", "909", "KEYS"] }
     func format(_ i: ParamInfo, _ v: Int) -> String { "\(v)" }
     func step(track: Int, step: Int) -> StepView { steps[track * 100 + step] ?? StepView() }
     func lock(track: Int, step: Int, param: Int) -> Int? { locks[(track * 100 + step) * 100 + param] }
@@ -241,6 +242,27 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.face(.jog(.right))?.value, "5 SYNTH")
         XCTAssertEqual(m.face(.jog(.left))?.value, "TURN: TRACK")
         XCTAssertEqual(m.jogDialPosition(.left), 2, "deck A's marker stays where it was left")
+    }
+
+    func testPacksOnTheMasterPage() {
+        send(.sync(.right), .press(true)); send(.sync(.right), .press(false))   // the MASTER page
+        XCTAssertEqual(m.page, .master)
+        XCTAssertEqual(m.face(.browse)?.title, "PACK")
+        XCTAssertEqual(m.face(.browse)?.value, "808")
+        XCTAssertEqual(send(.browse, .relative(1)), [], "turning only chooses")
+        XCTAssertEqual(m.face(.browse)?.value, "909")
+        XCTAssertEqual(send(.browse, .relative(-2)), [])
+        XCTAssertEqual(m.face(.browse)?.value, "KEYS", "around the list")
+        XCTAssertEqual(m.face(.browsePress)?.title, "LOAD PACK")
+        XCTAssertEqual(send(.browsePress, .press(true)), [.loadPack(2)])
+        XCTAssertEqual(send(.browsePress, .press(false)), [])
+        XCTAssertEqual(m.packLoaded?.index, 2)
+        XCTAssertEqual(send(.browsePress, .press(true), shifted: true), [.revertPack])
+        XCTAssertNil(m.packLoaded)
+        // other pages: BROWSE is the track again
+        send(.sync(.right), .press(true)); send(.sync(.right), .press(false))
+        XCTAssertNotEqual(m.page, .master)
+        XCTAssertEqual(m.face(.browse)?.title == "PACK", false)
     }
 
     func testShiftJogNudgesAndReleases() {

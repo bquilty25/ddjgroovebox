@@ -193,6 +193,15 @@ final class TrigStripView: NSView, TopStrip {
             setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2))
         }
         if now - lastEdit < Self.scopeShown + 0.5 && animFrame % 2 == 0 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
+        // the pack browser (MASTER page, BROWSE): shown while browsing and a few seconds after
+        packs = mapper.model.packNames
+        packCursor = mapper.packCursor
+        packLoaded = mapper.packLoaded
+        packReverted = mapper.packReverted
+        clockOffset = mapper.now() - CACurrentMediaTime()
+        let browsing = mapper.packBrowsed
+        if browsing != packBrowsed { packBrowsed = browsing; setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
+        if mapper.now() - packBrowsed < Self.scopeShown + 0.5 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         // only what changed: a track's row, or the middle
         if rows.count != new.count { rows = new; center = c; needsDisplay = true; return }
         for t in 0..<8 where rows[t] != new[t] { setNeedsDisplay(rowRect(t).insetBy(dx: -2, dy: -2)) }
@@ -208,6 +217,68 @@ final class TrigStripView: NSView, TopStrip {
     private var lastEdit = -100.0
     private var lastHit: [Double] = Array(repeating: -100, count: 8)
     static let scopeShown = 4.0                                  // seconds the page's picture stays after an edit
+    private var packs: [String] = []
+    private var packCursor = 0
+    private var packBrowsed: Double = -100
+    private var packLoaded: (index: Int, at: Double)?
+    private var packReverted: Double?
+    private var clockOffset = 0.0                                // mapper clock - CACurrentMediaTime
+    private var cartPos = 0.0                                   // the carousel's position (eases to the cursor)
+
+    /// The packs as cartridges in a row: the chosen one in the middle, big and lit; loading pushes it into the slot.
+    /// (the mapper's clock is the system's uptime: `now` below is the same clock)
+    private func drawPacks(_ g: CGContext, _ r: CGRect, now: Double) {
+        let n = packs.count
+        guard n > 0 else { return }
+        let target = Double(packCursor)
+        if abs(target - cartPos) > Double(n) / 2 { cartPos = target } else { cartPos += (target - cartPos) * 0.35 }
+        g.saveGState()
+        defer { g.restoreGState() }
+        g.clip(to: r.insetBy(dx: 0, dy: -2))
+        let cw = min(120, r.width / 4.2), chh = min(r.height - 30, cw * 0.72)
+        let loadAge = packLoaded.map { $0.index == packCursor ? now - $0.at : 99 } ?? 99
+        let palette = (0..<8).map { NSColor(argb: TrigColors.track[$0]) }
+        for i in 0..<n {
+            let off = CGFloat(Double(i) - cartPos)
+            guard abs(off) < 3.2 else { continue }
+            let chosen = i == packCursor
+            let scale = 1 - min(0.3, abs(off) * 0.18)
+            let w = cw * scale, h = chh * scale
+            var y = r.minY + 4 + (chh - h) / 2
+            if chosen && loadAge < 0.5 { y += CGFloat(sin(min(1, loadAge / 0.25) * .pi / 2)) * 6 }   // pushed in
+            let box = CGRect(x: r.midX + off * cw * 1.08 - w / 2, y: y, width: w, height: h)
+            let a: CGFloat = chosen ? 1 : 0.45
+            // the body, a label stripe in a track colour, the name
+            g.setFillColor(SloopStyle.s2.withAlphaComponent(a).cgColor)
+            let body = CGPath(roundedRect: box, cornerWidth: 6, cornerHeight: 6, transform: nil)
+            g.addPath(body); g.fillPath()
+            g.setStrokeColor((chosen ? SloopStyle.fg : SloopStyle.s3).cgColor)
+            g.setLineWidth(chosen ? 2 : 1)
+            g.addPath(body); g.strokePath()
+            let stripe = CGRect(x: box.minX + 6, y: box.minY + 6, width: box.width - 12, height: max(4, h * 0.14))
+            g.setFillColor(palette[i % 8].withAlphaComponent(a).cgColor); g.fill(stripe)
+            let size = max(11, min(26, h * 0.32))
+            let name = NSAttributedString(string: packs[i], attributes: [.font: SloopStyle.font(size),
+                                                                          .foregroundColor: (chosen ? SloopStyle.fg : SloopStyle.fg2).withAlphaComponent(a)])
+            let s = name.size()
+            name.draw(at: CGPoint(x: box.midX - s.width / 2, y: box.midY - s.height / 2 + h * 0.06))
+            // the cartridge's grip ridges
+            g.setFillColor(SloopStyle.s3.withAlphaComponent(a).cgColor)
+            for k in 0..<5 { g.fill(CGRect(x: box.midX - 14 + CGFloat(k) * 6, y: box.maxY - 9, width: 3, height: 5)) }
+            if chosen && loadAge < 0.35 {                         // the flash as it seats
+                g.setFillColor(SloopStyle.fg.withAlphaComponent(CGFloat(0.35 * (1 - loadAge / 0.35))).cgColor)
+                g.addPath(body); g.fillPath()
+            }
+        }
+        // what BROWSE and its press do here
+        let status: String
+        if let rv = packReverted, now - rv < 2 { status = "REVERTED: THE KIT BEFORE" }
+        else if let l = packLoaded, l.index == packCursor { status = "LOADED · SHIFT + PUSH: REVERT" }
+        else { status = "PUSH: LOAD (THE BEAT STAYS)" }
+        let hint = NSAttributedString(string: "PACK \(packCursor + 1)/\(n) · " + status,
+                                      attributes: [.font: SloopStyle.font(10), .foregroundColor: SloopStyle.fg2])
+        hint.draw(at: CGPoint(x: r.midX - hint.size().width / 2, y: r.minY + 4 + chh + 10))
+    }
 
     /// the empty middle of the strip, between the page line and the crossfader bar
     private var stageRect: CGRect {
@@ -240,6 +311,17 @@ final class TrigStripView: NSView, TopStrip {
             let lv = min(1, stageLevels[i] * 1.6)
             if lv > jump[i] + 0.15 { lastHit[i] = t }
             jump[i] = lv > jump[i] ? lv : jump[i] * 0.82
+        }
+        // the pack browser first (MASTER page, BROWSE turned or pushed), on the mapper's clock
+        let pt = t + clockOffset, browsed = pt - packBrowsed
+        if !packs.isEmpty, browsed < Self.scopeShown + 0.4 {
+            let a = CGFloat(min(1, (Self.scopeShown + 0.4 - browsed) / 0.4))
+            g.saveGState()
+            g.setAlpha(a)
+            drawPacks(g, CGRect(x: r.minX, y: r.minY, width: r.width, height: floorY - r.minY - 2), now: pt)
+            g.restoreGState()
+            if a >= 1 { return }
+            g.setAlpha(1 - a)
         }
         // the page's picture, while editing; fading back to the figures after
         let shown = t - lastEdit

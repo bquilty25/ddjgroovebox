@@ -378,3 +378,184 @@ void td_default_project(void)
     E.gparam[G_VOLUME] = 100;
     E.cur = 0;
 }
+
+/* ---- sound packs: kits on a fixed voice map (after the Syntakt's machine designs: a pitched body with sweep and
+ * hold, a transient, noise with its own decay; hats from metallic noise; an electric piano from two-operator FM whose
+ * modulation dies before the note) */
+
+static void kit_808(void)
+{
+    /* 1 KICK: the long sine boom, little sweep, almost no click */
+    prm(0, SRC(KK_TUNE), -5); prm(0, SRC(KK_DECAY), 112); prm(0, SRC(KK_SWEEP), 12); prm(0, SRC(KK_STIME), 30);
+    prm(0, SRC(KK_CLICK), 8); prm(0, SRC(KK_DRIVE), 4); prm(0, SRC(KK_TONE), 56); prm(0, SRC(KK_HOLD), 24);
+    prm(0, P_LEVEL, 112);
+    /* 2 HAT, open: metallic */
+    prm(1, SRC(HH_DECAY), 70); prm(1, SRC(HH_OPEN), 92); prm(1, SRC(HH_COLOR), 36); prm(1, SRC(HH_BRIGHT), 70);
+    prm(1, SRC(HH_RESO), 34); prm(1, SRC(HH_SPREAD), 8); prm(1, P_LEVEL, 92); prm(1, P_LOWCUT, 80); prm(1, P_PAN, 10);
+    /* 3 SNARE: two tones and noise */
+    td_set_machine_x(P, 2, TD_M_SNARE);
+    prm(2, SRC(SN_TUNE), 6); prm(2, SRC(SN_DECAY), 40); prm(2, SRC(SN_NOISE), 70); prm(2, SRC(SN_NDECAY), 46);
+    prm(2, SRC(SN_SNAP), 46); prm(2, SRC(SN_BODY), 84); prm(2, SRC(SN_TONE), 50); prm(2, P_LEVEL, 100); prm(2, P_REV, 28);
+    /* 4 HAT, closed */
+    prm(3, SRC(HH_DECAY), 16); prm(3, SRC(HH_OPEN), 0); prm(3, SRC(HH_COLOR), 36); prm(3, SRC(HH_BRIGHT), 76);
+    prm(3, SRC(HH_RESO), 24); prm(3, P_LEVEL, 88); prm(3, P_LOWCUT, 84); prm(3, P_PAN, -14);
+    /* 5 SYNTH: the sub bass, sine, gliding */
+    prm(4, SRC(SY_SHAPE), 0); prm(4, SRC(SY_SUB), 0); prm(4, SRC(SY_GLIDE), 50);
+    prm(4, P_CUT, 96); prm(4, P_RES, 0); prm(4, P_FENV, 0); prm(4, P_AATK, 0); prm(4, P_ADEC, 92); prm(4, P_ASUS, 0);
+    prm(4, P_AREL, 40); prm(4, P_LEVEL, 112); prm(4, P_ODRV, 10);
+    /* 6 SYNTH: a triangle major 7 chord */
+    prm(5, SRC(SY_SHAPE), 42); prm(5, SRC(SY_DETUNE), 10); prm(5, SRC(SY_CHORD), 2);
+    prm(5, P_CUT, 72); prm(5, P_ADEC, 52); prm(5, P_ASUS, 0); prm(5, P_AREL, 30); prm(5, P_DLY, 40); prm(5, P_REV, 50);
+    /* 7 TOM */
+    td_set_machine_x(P, 6, TD_M_TOM);
+    prm(6, SRC(TM_TUNE), -4); prm(6, SRC(TM_DECAY), 72); prm(6, SRC(TM_SWEEP), 6); prm(6, SRC(TM_STIME), 40);
+    prm(6, SRC(TM_NOISE), 6); prm(6, SRC(TM_TONE), 60); prm(6, P_LEVEL, 96); prm(6, P_PAN, 20);
+    /* 8 FM: the cowbell (two inharmonic tones, short) */
+    td_set_machine_x(P, 7, TD_M_FM);
+    prm(7, SRC(FM_RATIO), 2); prm(7, SRC(FM_INDEX), 30); prm(7, SRC(FM_FDBK), 0); prm(7, SRC(FM_ENVDEC), 20);
+    prm(7, SRC(FM_ENVAMT), 30); prm(7, P_ADEC, 26); prm(7, P_ASUS, 0); prm(7, P_AREL, 10); prm(7, P_LEVEL, 80);
+    prm(7, P_LOWCUT, 70);
+    scene(0, 4, P_CUT, 40); scene(0, 5, P_REV, 100);
+    scene(1, 0, SRC(KK_DRIVE), 70); scene(1, 4, P_ODRV, 60);
+}
+
+static void kit_909(void)
+{
+    /* 1 KICK: punch, click, drive */
+    prm(0, SRC(KK_TUNE), 0); prm(0, SRC(KK_DECAY), 54); prm(0, SRC(KK_SWEEP), 34); prm(0, SRC(KK_STIME), 20);
+    prm(0, SRC(KK_CLICK), 72); prm(0, SRC(KK_DRIVE), 46); prm(0, SRC(KK_TONE), 96); prm(0, SRC(KK_HOLD), 6);
+    prm(0, P_LEVEL, 110);
+    /* 2 HAT, open: bright noise */
+    prm(1, SRC(HH_DECAY), 56); prm(1, SRC(HH_OPEN), 86); prm(1, SRC(HH_COLOR), 86); prm(1, SRC(HH_BRIGHT), 100);
+    prm(1, SRC(HH_RESO), 10); prm(1, SRC(HH_SPREAD), 24); prm(1, P_LEVEL, 92); prm(1, P_LOWCUT, 80); prm(1, P_PAN, 10);
+    /* 3 CLAP */
+    prm(2, SRC(CP_DECAY), 50); prm(2, SRC(CP_SPREAD), 50); prm(2, SRC(CP_BURSTS), 4); prm(2, SRC(CP_TONE), 80);
+    prm(2, SRC(CP_ROOM), 50); prm(2, SRC(CP_RAND), 30); prm(2, P_LEVEL, 100); prm(2, P_REV, 40); prm(2, P_LOWCUT, 60);
+    /* 4 HAT, closed */
+    prm(3, SRC(HH_DECAY), 12); prm(3, SRC(HH_OPEN), 0); prm(3, SRC(HH_COLOR), 86); prm(3, SRC(HH_BRIGHT), 104);
+    prm(3, P_LEVEL, 86); prm(3, P_LOWCUT, 86); prm(3, P_PAN, -14);
+    /* 5 SYNTH: a saw bass */
+    prm(4, SRC(SY_SHAPE), 86); prm(4, SRC(SY_SUB), 50);
+    prm(4, P_CUT, 50); prm(4, P_RES, 50); prm(4, P_FENV, 30); prm(4, P_FDEC, 30); prm(4, P_ADEC, 40); prm(4, P_ASUS, 30);
+    prm(4, P_AREL, 12); prm(4, P_ODRV, 20); prm(4, P_DUCK, 60); prm(4, P_LEVEL, 96);
+    /* 6 SYNTH: a minor 7 stab into the delay */
+    prm(5, SRC(SY_SHAPE), 90); prm(5, SRC(SY_DETUNE), 20); prm(5, SRC(SY_CHORD), 1);
+    prm(5, P_CUT, 80); prm(5, P_ADEC, 34); prm(5, P_ASUS, 0); prm(5, P_AREL, 18); prm(5, P_DLY, 60); prm(5, P_REV, 40);
+    /* 7 SNARE: band-passed noise, snap */
+    td_set_machine_x(P, 6, TD_M_SNARE);
+    prm(6, SRC(SN_TUNE), 8); prm(6, SRC(SN_DECAY), 34); prm(6, SRC(SN_NOISE), 96); prm(6, SRC(SN_NDECAY), 50);
+    prm(6, SRC(SN_SNAP), 86); prm(6, SRC(SN_BODY), 50); prm(6, SRC(SN_TONE), 86); prm(6, SRC(SN_DRIVE), 20);
+    prm(6, P_LEVEL, 100); prm(6, P_REV, 30);
+    /* 8 SAMPLE: the vocal blip */
+    prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 90); prm(7, P_DLY, 60); prm(7, P_REV, 50);
+    scene(0, 4, P_CUT, 24); scene(0, 2, P_REV, 110);
+    scene(1, 4, P_CUT, 96); scene(1, 4, P_RES, 90); scene(1, 0, SRC(KK_DRIVE), 90);
+}
+
+static void kit_keys(void)
+{
+    /* 1 KICK: soft */
+    prm(0, SRC(KK_DECAY), 60); prm(0, SRC(KK_SWEEP), 20); prm(0, SRC(KK_CLICK), 14); prm(0, SRC(KK_DRIVE), 0);
+    prm(0, SRC(KK_TONE), 50); prm(0, P_LEVEL, 104);
+    /* 2 HAT, open: soft */
+    prm(1, SRC(HH_DECAY), 40); prm(1, SRC(HH_OPEN), 50); prm(1, SRC(HH_BRIGHT), 60); prm(1, P_LEVEL, 80); prm(1, P_LOWCUT, 80);
+    /* 3 SNARE: a rim */
+    td_set_machine_x(P, 2, TD_M_SNARE);
+    prm(2, SRC(SN_TUNE), 20); prm(2, SRC(SN_DECAY), 14); prm(2, SRC(SN_NOISE), 30); prm(2, SRC(SN_NDECAY), 14);
+    prm(2, SRC(SN_SNAP), 90); prm(2, SRC(SN_BODY), 40); prm(2, P_LEVEL, 90); prm(2, P_REV, 40);
+    /* 4 HAT, closed: soft */
+    prm(3, SRC(HH_DECAY), 10); prm(3, SRC(HH_BRIGHT), 60); prm(3, P_LEVEL, 78); prm(3, P_LOWCUT, 84);
+    /* 5 SYNTH: a round bass */
+    prm(4, SRC(SY_SHAPE), 20); prm(4, SRC(SY_SUB), 60); prm(4, P_CUT, 60); prm(4, P_RES, 10); prm(4, P_ADEC, 70);
+    prm(4, P_ASUS, 50); prm(4, P_AREL, 20); prm(4, P_LEVEL, 100);
+    /* 6 FM: the electric piano (ratio 1, the index dying fast: the tine) */
+    td_set_machine_x(P, 5, TD_M_FM);
+    prm(5, SRC(FM_RATIO), 1); prm(5, SRC(FM_INDEX), 34); prm(5, SRC(FM_FDBK), 6); prm(5, SRC(FM_ENVDEC), 26);
+    prm(5, SRC(FM_ENVAMT), 80); prm(5, P_AATK, 0); prm(5, P_ADEC, 80); prm(5, P_ASUS, 40); prm(5, P_AREL, 50);
+    prm(5, P_CHO, 50); prm(5, P_REV, 40); prm(5, P_LEVEL, 100); prm(5, P_LSPD, 30); prm(5, P_LWAVE, 0);
+    prm(5, P_LDEST, 22); prm(5, P_LDEPTH, 16);                 /* (a slow auto-pan, the suitcase's tremolo) */
+    /* 7 FM: the same piano, minor 7 chords, into the delay */
+    td_set_machine_x(P, 6, TD_M_FM);
+    prm(6, SRC(FM_RATIO), 1); prm(6, SRC(FM_INDEX), 30); prm(6, SRC(FM_FDBK), 6); prm(6, SRC(FM_ENVDEC), 26);
+    prm(6, SRC(FM_ENVAMT), 80); prm(6, SRC(FM_CHORD), 1); prm(6, P_ADEC, 80); prm(6, P_ASUS, 40); prm(6, P_AREL, 50);
+    prm(6, P_CHO, 50); prm(6, P_DLY, 30); prm(6, P_REV, 50); prm(6, P_LEVEL, 92);
+    /* 8 SYNTH: a slow open-9 pad */
+    td_set_machine_x(P, 7, TD_M_SYNTH);
+    prm(7, SRC(SY_SHAPE), 60); prm(7, SRC(SY_DETUNE), 40); prm(7, SRC(SY_CHORD), 7);
+    prm(7, P_AATK, 60); prm(7, P_ASUS, 100); prm(7, P_AREL, 80); prm(7, P_CUT, 50); prm(7, P_REV, 80); prm(7, P_CHO, 60);
+    prm(7, P_LEVEL, 80);
+    scene(0, 5, P_CUT, 40); scene(0, 7, P_CUT, 30);
+    scene(1, 5, SRC(FM_INDEX), 80); scene(1, 6, P_DLY, 90);
+}
+
+static const struct { const char *name; void (*fill)(void); } PACKS[] = {
+    {"808", kit_808}, {"909", kit_909}, {"KEYS", kit_keys},
+    {"HOUSE", pat_house}, {"DUB", pat_dub}, {"ACID", pat_acid}, {"ELECTRO", pat_electro},
+};
+#define NPACKS ((int)(sizeof PACKS / sizeof PACKS[0]))
+
+int td_pack_count(void) { return NPACKS; }
+const char *td_pack_name(int pack) { return pack >= 0 && pack < NPACKS ? PACKS[pack].name : ""; }
+
+/* the kit of a pattern: its machines, every page but TRIG, its scenes */
+typedef struct {
+    uint8_t machine[TD_TRACKS];
+    int16_t param[TD_TRACKS][TD_NPARAMS];
+    uint16_t nscene[2];
+    td_scene_ent_t scene[2][TD_SCENE_MAX];
+} td_kit_t;
+static td_kit_t g_undo;
+static int g_undo_ok = 0;
+static td_pattern_t g_scratch;
+
+static void kit_get(const td_pattern_t *p, td_kit_t *k)
+{
+    memcpy(k->machine, p->machine, sizeof k->machine);
+    memcpy(k->param, p->param, sizeof k->param);
+    memcpy(k->nscene, p->nscene, sizeof k->nscene);
+    memcpy(k->scene, p->scene, sizeof k->scene);
+}
+static void kit_put(td_pattern_t *p, const td_kit_t *k)
+{
+    for (int t = 0; t < TD_TRACKS; t++) {
+        if (p->machine[t] != k->machine[t])
+            for (int i = 0; i < TD_VOICES; i++) td_voice_fade(&E.trk[t].v[i], 5.f);
+        p->machine[t] = k->machine[t];
+        for (int q = TD_SLOTS; q < TD_NPARAMS; q++) p->param[t][q] = k->param[t][q];   /* (the TRIG page stays) */
+        E.trk[t].lk_mask = 0;
+    }
+    memcpy(p->nscene, k->nscene, sizeof p->nscene);
+    memcpy(p->scene, k->scene, sizeof p->scene);
+}
+
+void td_pack_load(int pack)
+{
+    if (pack < 0 || pack >= NPACKS) return;
+    static td_kit_t k;
+    P = &g_scratch;                                            /* (built aside, outside the lock) */
+    td_pattern_init_kit(P);
+    PACKS[pack].fill();
+    kit_get(P, &k);
+    td_lock();
+    if (E.inited) {
+        kit_get(&E.pat[E.cur], &g_undo);
+        g_undo_ok = 1;
+        kit_put(&E.pat[E.cur], &k);
+    }
+    td_unlock();
+}
+
+int td_pack_revert(void)
+{
+    int r = -1;
+    td_lock();
+    if (E.inited && g_undo_ok) {
+        static td_kit_t now;
+        kit_get(&E.pat[E.cur], &now);
+        kit_put(&E.pat[E.cur], &g_undo);
+        g_undo = now;                                          /* (revert again: back to the pack) */
+        r = 0;
+    }
+    td_unlock();
+    return r;
+}

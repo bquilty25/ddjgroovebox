@@ -116,6 +116,14 @@ public final class TrigMapper {
             if let t = heldTrackPads.values.first {       // a track held: roll the dice on it
                 return down ? [.dice(track: t, amount: 25)] : []
             }
+            if page == .master, !model.packNames.isEmpty {    // load the pack (SHIFT: put back the kit it replaced)
+                guard down else { return [] }
+                packBrowsed = now()
+                if e.shifted { packLoaded = nil; packReverted = now(); return [.revertPack] }
+                packLoaded = (packCursor, now())
+                packReverted = nil
+                return [.loadPack(packCursor)]
+            }
             return audition(.browsePress, down)
         case (.headphoneCue(let d), .press(let down)):
             let s = d == .left ? 0 : 1
@@ -317,8 +325,21 @@ public final class TrigMapper {
             let k = Machine.allCases.count
             return [.machine(track: track, machine: ((model.machine(track).rawValue + n) % k + k) % k)]
         }
+        if page == .master, !model.packNames.isEmpty {     // the sound packs: turn to choose, press to load
+            let k = model.packNames.count
+            packCursor = ((packCursor + n) % k + k) % k
+            packBrowsed = now()
+            return []
+        }
         return selectTrack(track + n)
     }
+
+    /// the pack BROWSE points at on the MASTER page, and when it last moved or loaded (the strip shows the list)
+    public private(set) var packCursor = 0
+    public private(set) var packBrowsed: Double = -100
+    /// the pack last loaded (its name slides in on the strip), and when
+    public private(set) var packLoaded: (index: Int, at: Double)?
+    public private(set) var packReverted: Double?
 
     /// ticks of a jog's side per track: a quarter turn of the platter (720 ticks a turn), so the marker on the drawn jog
     /// turns with the real one and the quadrant it points into is always the active track
@@ -456,8 +477,13 @@ public final class TrigMapper {
                 return ControlFace(title: "COND", value: model.condName(model.step(track: track, step: st).cond))
             }
             if page == .src { return ControlFace(title: "MACHINE", value: model.machineName(model.machine(track).rawValue), color: trackColor) }
+            if page == .master, packCursor < model.packNames.count {
+                return ControlFace(title: "PACK", value: model.packNames[packCursor], color: TrigColors.page[TrigPage.master.rawValue])
+            }
             return ControlFace(title: "TRACK", value: "\(track + 1)", color: trackColor)
-        case .browsePress: return ControlFace(title: heldTrackPads.isEmpty ? "AUDITION" : "DICE")
+        case .browsePress:
+            if heldTrackPads.isEmpty, page == .master, !model.packNames.isEmpty { return ControlFace(title: "LOAD PACK") }
+            return ControlFace(title: heldTrackPads.isEmpty ? "AUDITION" : "DICE")
         case .headphoneCue(let d):
             let s = d == .left ? 0 : 1
             return ControlFace(title: s == 0 ? "SCENE A" : "SCENE B", color: s == 0 ? TrigColors.sceneA : TrigColors.sceneB,

@@ -77,6 +77,15 @@ int td_global_info(int slot, td_param_info_t *out);      /* the MASTER page's 8 
 int td_format_value(const td_param_info_t *info, int value, char *out, int n);   /* "1.2 kHz", "-12", "1/16" */
 const char *td_cond_name(int cond);                      /* "ALWAYS", "FILL", "50%", "1:2" ... */
 const char *td_perf_name(int perf);                      /* "REPEAT" ... */
+
+/* (added) sound packs: a kit for all 8 tracks (machines and every page but TRIG, scenes), made by TRIGDECK's own
+ * engines, on a fixed voice map (1 kick, 2 open hat, 3 snare / clap, 4 closed hat, 5 bass, 6 keys / chords, 7 perc /
+ * lead, 8 sample or extra). Loading copies the kit into the current pattern and keeps its steps; revert puts back the
+ * kit the last load replaced. */
+int td_pack_count(void);
+const char *td_pack_name(int pack);                      /* "808" ... */
+void td_pack_load(int pack);
+int td_pack_revert(void);                                /* 0: reverted, -1: nothing to revert */
 /* (added) the A:B table behind TD_COND_AB: {A, B} = 1:2, 2:2, 1:3, 2:3, 3:3, 1:4, 2:4, 3:4, 4:4, 1:8 */
 extern const uint8_t td_cond_ab[10][2];
 const char *td_scale_name(int scale);                    /* (added) "MINOR", "MAJOR", "DORIAN", ... (0..7) */

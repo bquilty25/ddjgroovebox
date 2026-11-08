@@ -1128,6 +1128,51 @@ TEST(test_default_project)
     check("every track of P01 plays", all);
 }
 
+/* ---- sound packs */
+TEST(test_packs)
+{
+    check("seven packs, named", td_pack_count() == 7 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS"));
+    for (int k = 0; k < td_pack_count(); k++) {
+        td_init();                                             /* P01: the house beat */
+        td_step_t before = E.pat[0].step[0][0];
+        int16_t trigNote = E.pat[0].param[0][P_NOTE];
+        td_pack_load(k);
+        int map = E.pat[0].machine[0] == TD_M_KICK && E.pat[0].machine[1] == TD_M_HAT && E.pat[0].machine[3] == TD_M_HAT;
+        int kept = !memcmp(&E.pat[0].step[0][0], &before, sizeof before) && E.pat[0].param[0][P_NOTE] == trigNote;
+        td_play(1);
+        const int N = 48000 * 4;
+        static float b[2 * 1024];
+        double e = 0;
+        float pk = 0;
+        int finite = 1;
+        for (int i = 0; i < N; i += 1024) {
+            td_render(b, 1024, 0);
+            for (int s = 0; s < 2048; s++) { e += b[s] * b[s]; pk = fmaxf(pk, fabsf(b[s])); finite &= isfinite(b[s]) != 0; }
+        }
+        double rms = 10 * log10(e / (2.0 * N));
+        int silent = 0;
+        for (int t = 0; t < TD_TRACKS; t++) {                  /* every track of the house beat sounds with this kit */
+            td_init();
+            td_pack_load(k);
+            for (int u = 0; u < TD_TRACKS; u++) td_mute(u, u != t);
+            td_play(1);
+            if (td_render_offline((uint32_t)(48000 * 60 / 124.0 * 4 * 4)) < 0.003f) silent |= 1 << t;   /* (4 bars: the vocal is on 3:4) */
+        }
+        char msg[160];
+        snprintf(msg, sizeof msg, "%-7s kick / hats on 1, 2, 4, steps kept, 4 s: rms %.1f dBFS, peak %.2f, silent tracks %02x",
+                 td_pack_name(k), rms, pk, silent);
+        check(msg, map && kept && finite && pk <= 1.f && rms > -26 && rms < -8 && !silent);
+    }
+    td_init();
+    int16_t cut = E.pat[0].param[4][P_CUT];
+    uint8_t m6 = E.pat[0].machine[5];
+    td_pack_load(2);                                           /* KEYS: track 6 becomes the FM piano */
+    int changed = E.pat[0].machine[5] == TD_M_FM;
+    check("revert: the kit before the load comes back", changed && td_pack_revert() == 0 && E.pat[0].machine[5] == m6
+          && E.pat[0].param[4][P_CUT] == cut);
+    check("revert again: back to the pack", td_pack_revert() == 0 && E.pat[0].machine[5] == TD_M_FM);
+}
+
 /* ---- live recording, tap tempo, nudge */
 TEST(test_live)
 {
@@ -1200,6 +1245,7 @@ int main(void)
     RUN(test_autopilot);
     RUN(test_info);
     RUN(test_default_project);
+    RUN(test_packs);
     RUN(test_live);
     printf("\n%d checks, %d failed (%.1f s)\n", checks, fails, now() - t0);
     return fails;

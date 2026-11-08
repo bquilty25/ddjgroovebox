@@ -47,6 +47,7 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
     var bpm: Double { Double(state.bpm) }
     var swing: Int { Int(state.swing) }
     var autopilot: Bool { state.autopilot != 0 }
+    let packNames: [String] = (0..<td_pack_count()).map { String(cString: td_pack_name($0)) }
 
     private func tuple<T>(_ t: T, _ i: Int) -> Int32 {
         withUnsafeBytes(of: t) { $0.bindMemory(to: Int32.self)[i] }
@@ -173,6 +174,8 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
         case let .stepSlide(t, s, on): td_step_slide(i(t), i(s), on ? 1 : 0)
         case let .stepAccent(t, s, on): td_step_accent(i(t), i(s), on ? 1 : 0)
         case let .autopilot(on): td_autopilot(on ? 1 : 0)
+        case let .loadPack(p): td_pack_load(i(p)); infoCache = [:]       // (machines change: their parameters' names too)
+        case .revertPack: _ = td_pack_revert(); infoCache = [:]
         }
     }
 

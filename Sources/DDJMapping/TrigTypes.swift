@@ -53,6 +53,8 @@ public enum TrigAction: Hashable, Sendable {
     case stepAccent(track: Int, step: Int, on: Bool)
     // after DUB-1: the arranger that keeps the pattern evolving in 8-bar phrases
     case autopilot(Bool)
+    /// a sound pack's kit into the current pattern (its steps stay); revert: the kit it replaced
+    case loadPack(Int), revertPack
 }
 
 /// A parameter as the engine describes it (td_param_info).
@@ -91,6 +93,12 @@ public protocol TrigModel: AnyObject {
     var condCount: Int { get }
     func machineName(_ m: Int) -> String
     func trackLevel(_ track: Int) -> Double                // output level 0...1
+    /// the sound packs' names (kits for all 8 tracks), in the engine's order
+    var packNames: [String] { get }
+}
+
+public extension TrigModel {
+    var packNames: [String] { [] }
 }
 
 public struct StepView: Hashable, Sendable {

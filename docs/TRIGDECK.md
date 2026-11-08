@@ -32,6 +32,21 @@ with LOAD ◀ ▶; the switch happens at the end of the bar.
 Each has its own scenes on the crossfader: on P01, scene A is a filtered breakdown and scene B opens and drives the
 bass and the stab.
 
+## Sound packs
+
+A pack is a kit for all 8 tracks, made by TRIGDECK's own engines, on the same voice map: 1 kick, 2 open hat, 3 snare
+or clap, 4 closed hat, 5 bass, 6 keys or chords, 7 percussion or lead, 8 a sample or an extra. Swapping packs keeps a
+pattern musical. On the **MASTER** page (right BEAT SYNC), turn **BROWSE** to choose a pack (the strip shows them as
+cartridges), push it to load: the pattern's sounds and scenes change, its steps stay. **SHIFT + push** puts back the
+kit the load replaced (again: back to the pack).
+
+| Pack | The kit |
+|---|---|
+| 808 | a long sine kick, metallic hats, a two-tone snare, a gliding sub bass, a major 7 chord, a tom, a cowbell |
+| 909 | a punchy kick with click and drive, bright hats, a clap, a saw bass, a minor 7 stab, a snappy snare, the vocal |
+| KEYS | a soft kit, a round bass, an FM electric piano and its chords, a slow pad |
+| HOUSE, DUB, ACID, ELECTRO | the kits of the default patterns |
+
 ## How to read the controller
 
 - **Colours.** The knob rows always have the same colour: HI blue, MID green, LOW white, FILTER orange. The name

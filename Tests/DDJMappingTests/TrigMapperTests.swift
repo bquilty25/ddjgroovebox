@@ -244,6 +244,26 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.jogDialPosition(.left), 2, "deck A's marker stays where it was left")
     }
 
+    func testTrackLengthBySteps() {
+        // SHIFT + PAGE +: a bar longer (the pads go to the new bar); SHIFT + PAGE -: a bar shorter
+        XCTAssertEqual(send(.callRight(.right), .press(true), shifted: true), [.length(track: 0, steps: 32)])
+        XCTAssertEqual(m.stepPage, 1, "the pads show the new bar")
+        model.lengths[0] = 32
+        XCTAssertEqual(send(.callRight(.right), .press(true), shifted: true), [.length(track: 0, steps: 48)])
+        model.lengths[0] = 64
+        XCTAssertEqual(send(.callRight(.right), .press(true), shifted: true), [], "64 at most")
+        XCTAssertEqual(send(.callLeft(.right), .press(true), shifted: true), [.length(track: 0, steps: 48)])
+        model.lengths[0] = 37
+        XCTAssertEqual(send(.callLeft(.right), .press(true), shifted: true), [.length(track: 0, steps: 32)], "to the bar below")
+        // SHIFT + BROWSE: one step
+        model.lengths[0] = 16
+        XCTAssertEqual(send(.browse, .relative(-4), shifted: true), [.length(track: 0, steps: 12)])
+        XCTAssertFalse(send(.browse, .relative(1)).contains { if case .length = $0 { return true }; return false },
+                       "without SHIFT: BROWSE's page job, not the length")
+        // without SHIFT: PAGE - / + only move the pads' page
+        XCTAssertEqual(send(.callLeft(.right), .press(true)), [])
+    }
+
     func testPacksOnTheMasterPage() {
         send(.sync(.right), .press(true)); send(.sync(.right), .press(false))   // the MASTER page
         XCTAssertEqual(m.page, .master)

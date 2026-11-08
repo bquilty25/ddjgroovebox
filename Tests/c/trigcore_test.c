@@ -1156,6 +1156,13 @@ TEST(test_default_project)
     td_set_tempo(170);
     check("the tempo slider edits the pattern's own tempo", E.pat[12].bpm10 == 1700);
     td_play(0);
+    td_pattern_queue(0);
+    td_set_length_repeat(3, 48);                               /* the closed hats: 16 -> 48, the new bars repeat */
+    int same = E.pat[0].length[3] == 48;
+    for (int s = 16; s < 48; s++) same &= !memcmp(&E.pat[0].step[3][s], &E.pat[0].step[3][s % 16], sizeof(td_step_t));
+    td_set_length_repeat(3, 12);
+    check("a longer track repeats its steps in the new bars; shorter just shortens", same && E.pat[0].length[3] == 12);
+    td_play(0);
     const int N = (int)(48000 * 60 / 124.0 * 4 * 8);
     static float b[2 * 1024];
     for (int p = 0; p < 16; p++) {                             /* each of the sixteen, 8 bars at 124 (or so) */

@@ -953,6 +953,20 @@ void td_set_length(int track, int steps)
     if (ok_t(track)) E.pat[E.cur].length[track] = (uint8_t)clampi(steps, 1, TD_STEPS);
     td_unlock();
 }
+void td_set_length_repeat(int track, int steps)
+{
+    td_lock();
+    if (ok_t(track)) {
+        td_pattern_t *P = &E.pat[E.cur];
+        int old = P->length[track] ? P->length[track] : 16, n = clampi(steps, 1, TD_STEPS);
+        for (int s = old; s < n; s++) {                         /* the new steps repeat the old ones (with their locks) */
+            P->step[track][s] = P->step[track][s % old];
+            memcpy(P->lock[track][s], P->lock[track][s % old], sizeof P->lock[track][s]);
+        }
+        P->length[track] = (uint8_t)n;
+    }
+    td_unlock();
+}
 void td_trigger(int track, int note, int velocity)
 {
     td_lock();

@@ -119,6 +119,7 @@ void td_param_set(int track, int param, int value);      /* the track's base val
 int td_param_get(int track, int param);
 void td_mute(int track, int on);
 void td_set_length(int track, int steps);                /* 1 .. 64 */
+void td_set_length_repeat(int track, int steps);         /* (added) the same, the new steps repeating the old ones */
 void td_trigger(int track, int note, int velocity);      /* live play (recorded when recording); note 0..127 */
 void td_release(int track, int note);
 void td_clear_track(int track);

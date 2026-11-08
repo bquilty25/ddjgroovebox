@@ -176,6 +176,7 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
         case let .autopilot(on): td_autopilot(on ? 1 : 0)
         case let .loadPack(p): td_pack_load(i(p)); infoCache = [:]       // (machines change: their parameters' names too)
         case .revertPack: _ = td_pack_revert(); infoCache = [:]
+        case let .length(t, n): td_set_length_repeat(i(t), i(n))
         }
     }
 

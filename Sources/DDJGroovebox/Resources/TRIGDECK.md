@@ -75,7 +75,7 @@ kit the load replaced (again: back to the pack).
 | HI, MID, LOW, FILTER | the 8 parameters of the page: channel 1 = A-D, channel 2 = E-H |
 | LOOP IN, LOOP OUT, RELOOP | pages: left deck TRIG, SRC, FLTR; right deck AMP, FX, LFO |
 | Right BEAT SYNC | the MASTER page (delay, reverb, compressor...); again: back |
-| CUE/LOOP CALL ◀ ▶ | left deck: previous / next track; right deck: step page (17-32...) |
+| CUE/LOOP CALL ◀ ▶ | left deck: previous / next track; right deck: step page (17-32...). **Track length:** SHIFT + right ◀ ▶ makes the active track a bar shorter / longer (16, 32, 48, 64 steps; a new bar starts as a copy of the one before); SHIFT + turn BROWSE changes it a step at a time (1 to 64, for polymetric loops like 12 or 7) |
 | A track's row in the strip on top | click it: that track becomes the active one |
 | LOAD ◀ ▶ | previous / next pattern |
 | BROWSE | the machine (SRC page) or the track; press: audition the track |

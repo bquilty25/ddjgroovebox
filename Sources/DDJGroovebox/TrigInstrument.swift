@@ -203,6 +203,7 @@ final class TrigStripView: NSView, TopStrip {
             if stepPageSeen.1 > 1 || sp.1 > 1, sp.0 != stepPageSeen.0 || sp.2 != stepPageSeen.2 { pageChanged = now }
             stepPageSeen = sp
         }
+        if mapper.lengthChanged != lengthSeen { lengthSeen = mapper.lengthChanged; pageChanged = now }
         if now - pageChanged < Self.pageMapShown + 0.4 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         let browsing = mapper.packBrowsed
         if browsing != packBrowsed { packBrowsed = browsing; setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
@@ -230,6 +231,7 @@ final class TrigStripView: NSView, TopStrip {
     private var clockOffset = 0.0                                // mapper clock - CACurrentMediaTime
     private var stepPageSeen = (0, 1, 0)                         // (page, pages, track)
     private var pageChanged = -100.0
+    private var lengthSeen = -100.0
     static let pageMapShown = 2.5
 
     /// The active track's step pages as blocks, the one on the pads lit, the playhead running through them.
@@ -237,7 +239,8 @@ final class TrigStripView: NSView, TopStrip {
         let (page, pages, t) = stepPageSeen
         guard t < rows.count, pages > 0 else { return }
         let row = rows[t], c = NSColor(argb: row.color)
-        let title = NSAttributedString(string: "STEPS \(page * 16 + 1)-\(min(row.steps.count, page * 16 + 16))  ·  PAGE \(page + 1)/\(pages)",
+        let title = NSAttributedString(string: "STEPS \(page * 16 + 1)-\(min(row.steps.count, page * 16 + 16))  ·  PAGE \(page + 1)/\(pages)"
+                                       + "  ·  LENGTH \(row.steps.count)  (SHIFT + PAGE ±: A BAR)",
                                        attributes: [.font: SloopStyle.font(13), .foregroundColor: SloopStyle.fg])
         title.draw(at: CGPoint(x: r.midX - title.size().width / 2, y: r.minY))
         let gap: CGFloat = 10, top = r.minY + 22
@@ -257,7 +260,7 @@ final class TrigStripView: NSView, TopStrip {
                 if row.playhead == s { g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: box.minX + CGFloat(i) * cw, y: box.minY + 3, width: cw, height: box.height - 6).insetBy(dx: cw * 0.3, dy: 0)) }
             }
             g.setStrokeColor((on ? SloopStyle.fg : SloopStyle.s3).cgColor); g.setLineWidth(on ? 2 : 1); g.stroke(box)
-            let lbl = NSAttributedString(string: "\(p * 16 + 1)-\(p * 16 + 16)", attributes: [.font: SloopStyle.font(10),
+            let lbl = NSAttributedString(string: "\(p * 16 + 1)-\(min(row.steps.count, p * 16 + 16))", attributes: [.font: SloopStyle.font(10),
                                          .foregroundColor: on ? SloopStyle.fg : SloopStyle.fg2])
             lbl.draw(at: CGPoint(x: box.midX - lbl.size().width / 2, y: box.maxY - 13))
         }

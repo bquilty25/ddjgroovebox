@@ -55,6 +55,8 @@ public enum TrigAction: Hashable, Sendable {
     case autopilot(Bool)
     /// a sound pack's kit into the current pattern (its steps stay); revert: the kit it replaced
     case loadPack(Int), revertPack
+    /// a track's length (1 ... 64 steps); new steps repeat the old ones
+    case length(track: Int, steps: Int)
 }
 
 /// A parameter as the engine describes it (td_param_info).

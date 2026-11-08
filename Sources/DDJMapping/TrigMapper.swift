@@ -98,8 +98,15 @@ public final class TrigMapper {
         case (.reloop(let d), .press(true)): return setPage(d == .left ? .fltr : .lfo)
         case (.callLeft(.left), .press(true)): return selectTrack(track - 1)
         case (.callRight(.left), .press(true)): return selectTrack(track + 1)
+        case (.callLeft(.right), .press(true)) where e.shifted:     // SHIFT + PAGE -: a bar shorter
+            let n = model.length(track)
+            return setLength(n > 16 ? ((n - 1) / 16) * 16 : n)
+        case (.callRight(.right), .press(true)) where e.shifted:    // SHIFT + PAGE +: a bar longer (the new bar repeats)
+            return setLength(min(64, (model.length(track) / 16 + 1) * 16))
         case (.callLeft(.right), .press(true)): stepPage = max(0, stepPage - 1); return []
         case (.callRight(.right), .press(true)): stepPage = min(pageCount - 1, stepPage + 1); return []
+        case (.browse, .relative(let n)) where e.shifted && held.isEmpty && heldTrackPads.isEmpty:   // SHIFT: one step
+            return setLength(min(64, max(1, model.length(track) + n)))
         case (.load(let d), .press(true)):
             if !held.isEmpty {                           // a step held: LOAD left = slide, right = accent (acid)
                 let first = model.step(track: track, step: heldSteps[0])
@@ -184,6 +191,16 @@ public final class TrigMapper {
         sceneEdit = nil; nudgeLast = nil; knobLast = [:]; knobAcc = [:]; tempoPicked = false; swingPicked = false
         return out
     }
+
+    /// A new length for the active track; the pads go to the page holding its last step (to see what was added).
+    private func setLength(_ n: Int) -> [TrigAction] {
+        guard n != model.length(track) else { return [] }
+        stepPage = (n - 1) / 16
+        lengthChanged = now()
+        return [.length(track: track, steps: n)]
+    }
+    /// when the length last changed (the strip shows the page map)
+    public private(set) var lengthChanged: Double = -100
 
     /// the active track's step pages (16 steps each)
     public var pageCount: Int { max(1, (model.length(track) + 15) / 16) }

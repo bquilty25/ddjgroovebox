@@ -17,20 +17,19 @@ what it does right now and shows its value: you never have to translate between 
 
 ## Patterns to start from
 
-A new project holds eight patterns, classic grooves at 124 BPM in A minor. Switch with the pads in SAMPLER mode (left
-deck pads 1-8) or with LOAD ◀ ▶; the switch happens at the end of the pattern (P01 runs over 4 bars).
+A new project holds sixteen patterns in A minor, four each of house, techno, garage and drum & bass, each at its own
+tempo: switching to a pattern brings its tempo (the TEMPO slider then edits that pattern's). Switch with the pads in
+SAMPLER mode (left deck: house 1-4, techno 5-8; right deck: garage 1-4, drum & bass 5-8) or with LOAD ◀ ▶; the switch
+happens at the end of the pattern.
 
-| Pattern | What it is |
+| | Patterns |
 |---|---|
-| P01 DEEP HOUSE | 4 bars over Am9, Dm9, Fmaj7, Em7: four on the floor, shuffled hats, clap on 2 and 4, a syncopated bass on the roots with octave ghosts and slides, chord stabs into the delay, an FM pluck melody, a vocal every fourth bar. Hold the left BEAT SYNC (FILL): kicks and a clap roll |
-| P02 TECHNO | a driving kick, a ride, sixteenth hats, the rolling sub on the off-sixteenths, a stab on a 24-step loop, a 12-step tom pattern, a riser every 8 bars |
-| P03 DUB TECHNO | polymetric (16, 12, 10 and 7 steps), a chord stab into the tape delay, after DUB-1 |
-| P04 ACID | a 2-bar 303-style line (the second bar answers), the filter opening across it |
-| P05 ELECTRO | broken kicks, a snare on 2 and 4, a square bass, an FM zap |
-| P06 GARAGE | UK 2-step: the skipping kick, ghost snares, heavily shuffled hats, a sliding sub, organ stabs |
-| P07 DISCO | octave bass over Am7, Dm7, Gmaj7, Cmaj7, off-beat chord stabs, claps, an FM brass hit |
-| P08 BREAKS | a syncopated kick, ghost snares, swung eighths, a bass answering the kick, a pad |
-| P09-P16 | empty, with P01's sounds: write your own |
+| House | P01 DEEP 122 (4 bars over Am9, Dm9, Fmaj7, Em7: a syncopated bass, chord stabs, a pluck melody), P02 TECH 126 (a rolling sixteenth bass, toms and rims), P03 JACKIN 124 (claps with pickups, a heavy shuffle, electric piano), P04 AFRO 122 (a 3-3-2 tom pattern, a shaker, marimba plucks) |
+| Techno | P05 TECHNO 130 (the rolling off-beat sub, a 24-step stab, a 12-step tom), P06 ACID 132 (a 2-bar 303 line, the filter opening), P07 DUB 122 (polymetric, after DUB-1), P08 MELODIC 124 (an arpeggio over Am7, Fmaj7, Cmaj7, Gsus4, a pad) |
+| Garage | P09 2-STEP 132 (the skipping kick, ghost snares, a sliding sub, organ stabs), P10 SPEED 132 (four on the floor, the wheezy reese bass), P11 4X4 132 (an organ bass jumping octaves, electric-piano chords), P12 BASSLINE 138 (a wobbling bass) |
+| Drum & bass | P13 LIQUID 174 (the two-step, a long sub, electric-piano chords, a pad), P14 NEURO 174 (a reese in a sixteenth rhythm, metallic stabs), P15 JUNGLE 165 (a chopped break, a ride, a deep sub), P16 ROLLER 172 (rolling hats and sub, a tom groove) |
+
+Hold the left BEAT SYNC (FILL) for the fills (kicks and a clap roll on the four-on-the-floor patterns).
 
 Each has its own scenes on the crossfader: on P01, scene A is a filtered breakdown and scene B opens and drives the
 bass and the stab.
@@ -48,7 +47,8 @@ kit the load replaced (again: back to the pack).
 | 808 | a long sine kick, metallic hats, a two-tone snare, a gliding sub bass, a major 7 chord, a tom, a cowbell |
 | 909 | a punchy kick with click and drive, bright hats, a clap, a saw bass, a minor 7 stab, a snappy snare, the vocal |
 | KEYS | a soft kit, a round bass, an FM electric piano and its chords, a slow pad |
-| HOUSE, TECHNO, DUB, ACID, ELECTRO, GARAGE, DISCO, BREAKS | the kits of the default patterns |
+| DEEP ... ROLLER | the kits of the sixteen patterns |
+| MINIMAL, FILTER, HARD, PROG, DISCO, BREAKS, ELECTRO | more kits: minimal, French filter house, hard techno, progressive, disco, breaks, electro |
 
 ## How to read the controller
 

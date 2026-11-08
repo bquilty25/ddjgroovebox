@@ -208,6 +208,7 @@ typedef struct {
     td_lock_t lock[TD_TRACKS][TD_STEPS][TD_LPS];
     uint16_t nscene[2];
     td_scene_ent_t scene[2][TD_SCENE_MAX];
+    uint16_t bpm10;                                            /* (added) the pattern's own tempo x 10; 0: keep the current */
 } td_pattern_t;
 
 /* ---- voices */
@@ -428,6 +429,13 @@ typedef struct {
 
 extern td_engine_t td_E;
 #define E td_E
+
+/* (added) a pattern that has its own tempo brings it when it becomes the current one */
+static inline void td_pattern_tempo(void)
+{
+    uint16_t b = E.pat[E.cur].bpm10;
+    if (b) E.bpm = clampf((float)b * 0.1f, 30.f, 300.f);
+}
 
 /* big buffers (td_engine.c, td_samples.c) */
 extern float td_ring[TD_DECKS][TD_RING * 2];

@@ -7,8 +7,8 @@ what it does and its value right now: the controller is the screen.
   machines, a synth, FM and a sampler, an Elektron-style sequencer (trigs, parameter locks, conditions, micro timing,
   retrigs), scenes morphed by the crossfader, decks you scratch with the jogs while the pattern runs on underneath,
   beat FX for performance, resampling, Euclidean and generative tools, and an AUTOPILOT that arranges the pattern in
-  8-bar phrases. It opens on a deep house pattern, with techno, dub techno, acid, electro, garage, disco and breaks
-  patterns next to it, and sound packs (808, 909, KEYS and the patterns' kits). See [docs/TRIGDECK.md](docs/TRIGDECK.md) for the guide and
+  8-bar phrases. It opens on sixteen patterns, four each of house, techno, garage and drum & bass, each at its own
+  tempo, with sound packs (808, 909, KEYS and 23 more kits). See [docs/TRIGDECK.md](docs/TRIGDECK.md) for the guide and
   [docs/VISION.md](docs/VISION.md) for the design.
 - **Cartridges** are M-VAVE FM-1 firmwares running unchanged on the Mac, played through an FM-1 panel mapping. The
   first is **SLOOP** by isod89 (Instrument > SLOOP, Cmd-2); see [docs/MAPPING.md](docs/MAPPING.md).

@@ -56,7 +56,14 @@ static void render_frames(int64_t frames, int chunk)            /* renders, coll
 static void setup_empty(float bpm)                             /* an empty pattern (the default sounds), stopped */
 {
     td_init();
-    td_pattern_queue(12);                                      /* (P13: empty, P01's sounds) */
+    for (int p = 12; p < 16; p++) {                            /* P13..P16 made empty for the tests: P01's sounds */
+        E.pat[p] = E.pat[0];
+        memset(E.pat[p].step, 0, sizeof E.pat[p].step);
+        memset(E.pat[p].lock, 0, sizeof E.pat[p].lock);
+        for (int t = 0; t < TD_TRACKS; t++) E.pat[p].length[t] = 16;
+        E.pat[p].bpm10 = 0;
+    }
+    td_pattern_queue(12);
     td_set_tempo(bpm);
     td_set_swing(50);
     td_midi_config(0, 1);
@@ -614,7 +621,8 @@ TEST(test_project)
     check("round trip: the same bytes", nb == na && !memcmp(a, b, (size_t)na));
     td_state_t st;
     td_get_state(&st);
-    check("tempo, parameters, steps and mutes restored", fabsf(st.bpm - 124.f) < 0.05f && td_param_get(3, P_CUT) != 11 && !st.muted[5]);
+    check("tempo, parameters, steps and mutes restored", fabsf(st.bpm - 122.f) < 0.05f && td_param_get(3, P_CUT) != 11 && !st.muted[5]);
+    check("the patterns' own tempos too (version 2)", E.pat[12].bpm10 == 1740 && E.pat[0].bpm10 == 1220);
     td_set_tempo(99);
     int nc = td_project_save(c, n);
     memcpy(b, c, (size_t)nc);
@@ -1104,31 +1112,41 @@ TEST(test_default_project)
     int four = 1, lengths = 1;
     for (int s = 0; s < 16; s++) four &= E.pat[0].step[0][s].trig == (s % 4 == 0 || s >= 14);   /* (14, 15: FILL) */
     for (int t = 0; t < TD_TRACKS; t++) lengths &= st.length[t] == (t >= 4 && t <= 6 ? 64 : 16);
-    check("opens on P01, deep house at 124 BPM: four on the floor; bass, chords, melody over 4 bars",
-          st.pattern == 0 && fabsf(st.bpm - 124.f) < 0.01f && four && lengths && E.pat[0].step[0][14].cond == TD_COND_FILL);
+    check("opens on P01, deep house at 122 BPM: four on the floor; bass, chords, melody over 4 bars",
+          st.pattern == 0 && fabsf(st.bpm - 122.f) < 0.01f && four && lengths && E.pat[0].step[0][14].cond == TD_COND_FILL);
     int chordTypes = 0;                                        /* the stabs lock the progression's chord types */
     for (int b = 0; b < 4; b++)
         for (int k = 0; k < E.pat[0].step[5][b * 16 + 2].nlocks; k++)
             if (E.pat[0].lock[5][b * 16 + 2][k].param == P_SRC + SY_CHORD) chordTypes |= 1 << E.pat[0].lock[5][b * 16 + 2][k].value;
     check("P01's chords: minor 9, major 7, minor 7 locked per bar", chordTypes == ((1 << 3) | (1 << 2) | (1 << 1)));
-    check("P02 techno: the rumble (off-sixteenths), a 24-step stab, a 12-step tom",
-          E.pat[1].step[4][1].trig && !E.pat[1].step[4][4].trig && E.pat[1].length[5] == 24 && E.pat[1].length[6] == 12
-          && E.pat[1].machine[6] == TD_M_TOM);
-    check("P03 dub techno (polymetric 16, 12, 10, 7), P05 electro and P06 garage (track 3 a snare)",
-          E.pat[2].length[3] == 12 && E.pat[2].length[5] == 10 && E.pat[2].length[6] == 7 && E.pat[4].machine[2] == TD_M_SNARE
-          && E.pat[5].machine[2] == TD_M_SNARE);
-    check("P06 garage: the skipping kick (1, the 'and' of 3), shuffled hats",
-          E.pat[5].step[0][0].trig && E.pat[5].step[0][10].trig && !E.pat[5].step[0][4].trig && E.pat[5].step[3][1].micro > 0);
-    int slides = 0, empty = 1;
-    for (int s = 0; s < 32; s++) slides += E.pat[3].step[4][s].slide;
-    for (int p = 8; p < TD_PATTERNS; p++)
-        for (int t = 0; t < TD_TRACKS; t++)
-            for (int s = 0; s < TD_STEPS; s++) empty &= !E.pat[p].step[t][s].trig;
-    check("P04 acid: 2 bars, slides; P09..P16 empty, with P01's sounds",
-          E.pat[3].length[4] == 32 && slides >= 6 && empty && !memcmp(E.pat[15].param, E.pat[0].param, sizeof E.pat[0].param));
+    int fotf = 0;                                              /* house, techno and P10..P12 garage: four on the floor */
+    for (int p = 0; p < 12; p++) {
+        int k = 1;
+        for (int s = 0; s < 16; s += 4) k &= E.pat[p].step[0][s].trig;
+        fotf += k;
+    }
+    check("four on the floor: the house and techno patterns (but dub's own) and three of the garage ones", fotf >= 10);
+    static const int tempos[16] = {122, 126, 124, 122, 130, 132, 122, 124, 132, 132, 132, 138, 174, 174, 165, 172};
+    int tok = 1;
+    for (int p = 0; p < 16; p++) tok &= E.pat[p].bpm10 == tempos[p] * 10;
+    check("each pattern has its tempo (house ~124, techno ~130, garage 132-138, drum & bass 165-174)", tok);
+    int dnb = 1;                                               /* the two-step: kick on 1 and the "and" of 3, snare 2 and 4 */
+    for (int p = 12; p < 16; p++) dnb &= E.pat[p].step[2][4].trig && E.pat[p].step[2][12].trig && E.pat[p].step[0][0].trig;
+    check("drum & bass P13..P16: snare on 2 and 4 over a kick on 1, track 3 a snare", dnb && E.pat[13].machine[2] == TD_M_SNARE);
+    check("P09 2-step garage: the skipping kick (1, the 'and' of 3), shuffled hats",
+          E.pat[8].step[0][0].trig && E.pat[8].step[0][10].trig && !E.pat[8].step[0][4].trig && E.pat[8].step[3][1].micro > 0);
+    /* the tempo follows the pattern: queue P13 (174) while playing; it switches at the boundary and brings its tempo */
+    td_play(1);
+    td_pattern_queue(12);
+    td_render_offline((uint32_t)(48000 * 60 / 122.0 * 4 * 4 + 4800));
+    td_get_state(&st);
+    check("switching to P13 brings 174 BPM", st.pattern == 12 && fabsf(st.bpm - 174.f) < 0.01f);
+    td_set_tempo(170);
+    check("the tempo slider edits the pattern's own tempo", E.pat[12].bpm10 == 1700);
+    td_play(0);
     const int N = (int)(48000 * 60 / 124.0 * 4 * 8);
     static float b[2 * 1024];
-    for (int p = 0; p < 8; p++) {                              /* each of the eight, 8 bars */
+    for (int p = 0; p < 16; p++) {                             /* each of the sixteen, 8 bars at 124 (or so) */
         td_init();
         td_pattern_queue(p);
         td_play(1);
@@ -1158,8 +1176,8 @@ TEST(test_default_project)
 /* ---- sound packs */
 TEST(test_packs)
 {
-    check("eleven packs, named", td_pack_count() == 11 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS")
-          && !strcmp(td_pack_name(10), "BREAKS"));
+    check("26 packs, named", td_pack_count() == 26 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS")
+          && !strcmp(td_pack_name(15), "LIQUID") && !strcmp(td_pack_name(25), "ELECTRO"));
     for (int k = 0; k < td_pack_count(); k++) {
         td_init();                                             /* P01: the house beat */
         td_step_t before = E.pat[0].step[0][0];

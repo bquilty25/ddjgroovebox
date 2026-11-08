@@ -467,6 +467,7 @@ void td_seq_apply(const td_event_t *ev, int64_t frame)
     switch (ev->type) {
     case EV_SWITCH:
         E.cur = ev->pat;
+        td_pattern_tempo();
         E.cur_origin = (int64_t)llround(ev->t);
         if (E.queued == ev->pat)
             E.queued = -1;

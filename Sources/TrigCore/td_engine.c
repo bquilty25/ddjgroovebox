@@ -759,7 +759,7 @@ void td_play(int on)
     td_lock();
     if (E.inited) {
         if (on && !E.playing) {
-            if (E.queued >= 0) { E.cur = E.queued; E.queued = -1; }
+            if (E.queued >= 0) { E.cur = E.queued; E.queued = -1; td_pattern_tempo(); }
             td_seq_reset_transport();
             E.playing = 1;
             if (E.midi_clock) td_midi_push(0xFA, 0, 0, 1, (int64_t)E.frames_int);
@@ -783,7 +783,10 @@ void td_restart(void)
 void td_set_tempo(float bpm)
 {
     td_lock();
-    if (bpm == bpm) E.bpm = clampf(bpm, 30.f, 300.f);
+    if (bpm == bpm) {
+        E.bpm = clampf(bpm, 30.f, 300.f);
+        if (E.pat[E.cur].bpm10) E.pat[E.cur].bpm10 = (uint16_t)lroundf(E.bpm * 10.f);   /* (it edits the pattern's own) */
+    }
     td_unlock();
 }
 static double now_s(void)
@@ -984,6 +987,7 @@ void td_pattern_queue(int pattern)
         if (!E.playing) {
             E.cur = E.dec_pat = pattern;
             E.queued = -1;
+            td_pattern_tempo();
         } else
             E.queued = pattern;
     }

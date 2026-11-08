@@ -3,9 +3,9 @@
  * MASTER page. Not the samples' audio, not the deck faders or the crossfader (physical controls).
  *
  * Layout (little-endian):
- *   "TDPJ"  u16 version (1)  u16 0  u32 payload bytes  u32 CRC-32 of the payload
+ *   "TDPJ"  u16 version (2; 1 loads too)  u16 0  u32 payload bytes  u32 CRC-32 of the payload
  *   payload: u16 bpm x 10, u8 swing, u8 pattern, u8 key root, u8 scale, u8 mutes (bit per track), u8 0, i16 master[8],
- *            then per pattern: u8 machine[8], u8 length[8], i16 param[8][48],
+ *            then per pattern: u8 machine[8], u8 length[8], (v2) u16 tempo x 10 (0: none), i16 param[8][48],
  *            per track and step: u8 trig note vel cond retrig rate, i8 micro, u8 flags (1 slide, 2 accent),
  *                                u8 locks, locks x (u8 param, i16 value),
  *            per scene: u16 count, count x (u8 track, u8 param, i16 value).
@@ -13,7 +13,7 @@
  * magic or version, a wrong length, a bad CRC or anything that does not parse is refused and nothing changes. */
 #include "td_internal.h"
 
-#define TD_PROJ_VERSION 1
+#define TD_PROJ_VERSION 2                                     /* (2: each pattern's tempo; 1 still loads) */
 #define HDR 16
 
 uint32_t td_crc32(const void *data, size_t n)
@@ -36,7 +36,7 @@ uint32_t td_crc32(const void *data, size_t n)
 
 size_t td_project_size(void)
 {
-    size_t per = 16 + TD_TRACKS * TD_NPARAMS * 2 + (size_t)TD_TRACKS * TD_STEPS * (9 + TD_LPS * 3) + 2 * (2 + TD_SCENE_MAX * 4);
+    size_t per = 16 + 2 + TD_TRACKS * TD_NPARAMS * 2 + (size_t)TD_TRACKS * TD_STEPS * (9 + TD_LPS * 3) + 2 * (2 + TD_SCENE_MAX * 4);
     return HDR + 8 + TD_SLOTS * 2 + TD_PATTERNS * per;
 }
 
@@ -69,6 +69,7 @@ int td_project_save(void *buf, size_t n)
         const td_pattern_t *P = &E.pat[pi];
         for (int t = 0; t < TD_TRACKS; t++) w8(&w, P->machine[t]);
         for (int t = 0; t < TD_TRACKS; t++) w8(&w, P->length[t]);
+        w16(&w, P->bpm10);
         for (int t = 0; t < TD_TRACKS; t++)
             for (int q = 0; q < TD_NPARAMS; q++) w16(&w, P->param[t][q]);
         for (int t = 0; t < TD_TRACKS; t++)
@@ -117,7 +118,7 @@ int td_project_load(const void *buf, size_t n)
     int version = (uint16_t)r16(&hr);
     r16(&hr);
     uint32_t payload = r32(&hr), crc = r32(&hr);
-    if (version != TD_PROJ_VERSION || (size_t)payload != n - HDR || td_crc32(h + HDR, payload) != crc)
+    if (version < 1 || version > TD_PROJ_VERSION || (size_t)payload != n - HDR || td_crc32(h + HDR, payload) != crc)
         return -1;
     td_lock();
     rd_t r = {h, n, HDR, 0};
@@ -134,6 +135,10 @@ int td_project_load(const void *buf, size_t n)
         memset(P, 0, sizeof *P);
         for (int t = 0; t < TD_TRACKS; t++) P->machine[t] = (uint8_t)clampi(r8(&r), 0, TD_MACHINES - 1);
         for (int t = 0; t < TD_TRACKS; t++) P->length[t] = (uint8_t)clampi(r8(&r), 1, TD_STEPS);
+        if (version >= 2) {                                    /* (v2: the pattern's own tempo; 0 = none) */
+            int b = (uint16_t)r16(&r);
+            P->bpm10 = (uint16_t)(b ? clampi(b, 300, 3000) : 0);
+        }
         for (int t = 0; t < TD_TRACKS; t++)
             for (int q = 0; q < TD_NPARAMS; q++) {
                 const td_pdesc_t *d = td_pdesc(P->machine[t], q);

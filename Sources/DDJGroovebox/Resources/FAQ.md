@@ -19,9 +19,10 @@ SHIFT and press the left BEAT SYNC (AUTOPILOT). To write: HOT CUE mode, tap pads
 knob to lock that value on that step.
 
 **What other patterns are there?**
-P01 deep house, P02 techno, P03 dub techno, P04 acid, P05 electro, P06 garage, P07 disco, P08 breaks; P09 to P16 are
-empty, with P01's sounds. In SAMPLER mode the left pads 1-8 switch to them at the end of the pattern (LOAD ◀ ▶ also
-steps through them). Their kits are also sound packs: on the MASTER page, BROWSE chooses one, push loads it.
+Sixteen, four of each: house (P01-04), techno (P05-08), garage (P09-12) and drum & bass (P13-16), each with its own
+tempo. In SAMPLER mode the left pads switch to house and techno, the right pads to garage and drum & bass, at the end
+of the pattern (LOAD ◀ ▶ also steps through them). Their kits are also sound packs: on the MASTER page, BROWSE chooses
+one, push loads it.
 
 **Do I need the DDJ-400?**
 No. Click and drag the drawing, scroll over a jog or BROWSE, or play the Mac keyboard: 1-8 and Q-I are the pads, space

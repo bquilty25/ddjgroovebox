@@ -60,7 +60,7 @@ final class TrigCoreTests: XCTestCase {
         var st = td_state_t()
         td_get_state(&st)
         XCTAssertEqual(st.pattern, 0)
-        XCTAssertEqual(st.bpm, 124, accuracy: 0.01)
+        XCTAssertEqual(st.bpm, 122, accuracy: 0.01, "P01's own tempo")
         XCTAssertEqual(st.length.0, 16)
         XCTAssertEqual(st.length.6, 64, "the melody runs over the 4-bar progression")
         XCTAssertEqual(st.machine.0, m(TD_M_KICK))

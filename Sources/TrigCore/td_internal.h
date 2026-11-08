@@ -351,14 +351,23 @@ typedef struct {
     uint32_t rng, count;
     int64_t bar;                                               /* global bar (from play start) last handled */
     int kind, next_kind, drop_bars, fill_bar, chord_wait, degree, transpose, phrases;
-    uint8_t mute[TD_TRACKS], override[TD_TRACKS];
+    uint8_t mute[TD_RT_TRACKS], override[TD_RT_TRACKS];        /* (runtime tracks: the deck on air's) */
     int fill;
-    float walk[TD_TRACKS][3], walk_t[TD_TRACKS][3];            /* cutoff, delay send, FM index */
-    float cut_ramp[TD_TRACKS], cut_ramp_t[TD_TRACKS];          /* breakdown / build filter moves */
+    float walk[TD_RT_TRACKS][3], walk_t[TD_RT_TRACKS][3];      /* cutoff, delay send, FM index */
+    float cut_ramp[TD_RT_TRACKS], cut_ramp_t[TD_RT_TRACKS];    /* breakdown / build filter moves */
     float dfb, dfb_t;                                          /* build: delay feedback */
 } td_auto_t;
 
 typedef struct { uint8_t b[3], n; int64_t frame; } td_midimsg_t;   /* frame: on the internal timeline */
+
+/* (DJ decks) a deck plays a whole pattern: runtime tracks deck * 8 .. deck * 8 + 7 are its pattern's tracks 0..7.
+ * Both decks run on the one clock (gpos): a deck's pattern starts at its origin (a bar line), its switches at the end
+ * of its own pattern. */
+typedef struct {
+    int pat, playing, queued;                                  /* its pattern; queued: the next one, -1 none */
+    int dec_pat;                                               /* the pattern being decided (a step ahead) */
+    int64_t origin, dec_origin;                                /* the step its pattern started on (playing, deciding) */
+} td_dk_t;
 
 typedef struct {
     int inited;
@@ -368,20 +377,22 @@ typedef struct {
     int swing;
     int scale_root, scale;
     /* transport */
-    int playing, recording, fill_user;
-    int cur, dec_pat, queued;
-    int64_t cur_origin, dec_origin, kdec;
+    int playing, recording, fill_user;                         /* playing: the clock runs (a deck or both) */
+    td_dk_t dk[TD_DECKS];                                      /* (DJ decks) each deck's pattern and timing */
+    int focus, on_air;                                         /* the deck edited; the deck heard (its tempo, scenes) */
+    int cur;                                                   /* the edited pattern: always dk[focus].pat (td_sync_cur) */
+    int64_t kdec;
     int64_t next_bar, next_clk;                                /* the next bar line and MIDI clock pulse to send */
     double gpos;
     td_event_t ev[TD_EVQ];
     int nev;
-    /* tracks */
-    td_track_t trk[TD_TRACKS];
-    uint8_t muted[TD_TRACKS];
+    /* tracks: runtime tracks, deck * 8 + track */
+    td_track_t trk[TD_RT_TRACKS];
+    uint8_t muted[TD_RT_TRACKS];
     uint32_t rng, dice_count;
     float xf, xf_s;
-    float duck;
-    int duck_att;
+    float duck[TD_DECKS];                                      /* each deck's sidechain (its track 1) */
+    int duck_att[TD_DECKS];
     /* buses */
     td_deck_t deck[TD_DECKS];
     td_insert_t ins;
@@ -431,12 +442,20 @@ typedef struct {
 extern td_engine_t td_E;
 #define E td_E
 
-/* (added) a pattern that has its own tempo brings it when it becomes the current one */
+/* (added) a pattern that has its own tempo brings it when it starts on the deck on air */
 static inline void td_pattern_tempo(void)
 {
-    uint16_t b = E.pat[E.cur].bpm10;
+    uint16_t b = E.pat[E.dk[E.on_air].pat].bpm10;
     if (b) E.bpm = clampf((float)b * 0.1f, 30.f, 300.f);
 }
+/* (DJ decks) a runtime track's deck, its pattern's track, its deck's pattern (playing) */
+#define RT_DECK(rt) ((rt) / TD_TRACKS)
+#define RT_TR(rt) ((rt) % TD_TRACKS)
+#define RT_PAT(rt) (&E.pat[E.dk[RT_DECK(rt)].pat])
+/* the runtime track of the edited deck's track t (the editing API's tracks are 0..7 on the deck edited) */
+static inline int td_rt(int t) { return E.focus * TD_TRACKS + t; }
+/* the edited pattern follows the edited deck */
+static inline void td_sync_cur(void) { E.cur = E.dk[E.focus].pat; }
 
 /* big buffers (td_engine.c, td_samples.c) */
 extern float td_ring[TD_DECKS][TD_RING * 2];
@@ -476,6 +495,7 @@ void td_seq_block(double g0, double rate, td_event_t *out, int *off, int *nout, 
 void td_seq_apply(const td_event_t *ev, int64_t frame);
 void td_seq_reset_transport(void);
 void td_seq_stop_notes(void);
+void td_seq_stop_deck(int deck);                               /* (DJ decks) one deck's notes and events */
 void td_track_eff(int t);                                      /* compute trk[t].eff from base, locks, scenes, LFO, autopilot */
 void td_lfo_advance(int t, int n, double rate);
 void td_note_on(int t, int note, float vel, int32_t gate, int flags);

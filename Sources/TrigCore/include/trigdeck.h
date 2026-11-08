@@ -16,7 +16,8 @@ extern "C" {
 
 #define TD_SAMPLE_RATE 48000
 #define TD_TRACKS 8
-#define TD_DECKS 2                 /* deck A: tracks 0-3, deck B: tracks 4-7 */
+#define TD_DECKS 2                 /* (DJ decks) deck A and deck B each play a whole pattern */
+#define TD_RT_TRACKS (TD_DECKS * TD_TRACKS)   /* runtime tracks: deck * 8 + the pattern's track */
 #define TD_STEPS 64
 #define TD_PATTERNS 16
 #define TD_PATTERN_NAME 12             /* a pattern's name: up to 11 characters */
@@ -97,7 +98,14 @@ extern const uint8_t td_cond_ab[10][2];
 const char *td_scale_name(int scale);                    /* (added) "MINOR", "MAJOR", "DORIAN", ... (0..7) */
 
 /* ---- transport and global */
-void td_play(int on);
+void td_play(int on);                                    /* the deck on air (on); everything (off) */
+/* (DJ decks) each deck plays a pattern, on the one clock. A deck started while the other plays starts on the next bar
+ * line; a deck stopped releases its notes. The editing API (steps, params, scenes, mutes, td_pattern_queue...) acts on
+ * the deck edited (td_focus); the deck on air sets the tempo and gets the crossfader's scenes. */
+void td_deck_play(int deck, int on);
+void td_deck_pattern(int deck, int pattern);             /* at once when the deck is stopped, else at its pattern's end */
+void td_focus(int deck);                                 /* the deck the editing API edits */
+void td_on_air(int deck);                                /* the deck heard: its tempo and its scenes */
 void td_restart(void);                                   /* back to step 1 (playing or not) */
 void td_set_tempo(float bpm);                            /* 30 .. 300 */
 void td_tap_tempo(void);
@@ -197,6 +205,12 @@ typedef struct {
     uint32_t bar, beat;                                  /* the transport position (1-based) */
     int32_t autopilot, phrase_bar;                       /* (added) AUTOPILOT on; the bar in its 8-bar phrase, 1..8 */
     int32_t scale_root, scale, transpose;                /* (added) the key; AUTOPILOT's chord transposition */
+    /* (DJ decks) the fields above describe the deck edited (focus); these, both decks */
+    int32_t focus, on_air;                               /* the deck edited, the deck heard (0 A, 1 B) */
+    int32_t deck_pattern[TD_DECKS], deck_queued[TD_DECKS], deck_playing[TD_DECKS];
+    int32_t deck_step[TD_DECKS][TD_TRACKS], deck_machine[TD_DECKS][TD_TRACKS];
+    int32_t deck_muted[TD_DECKS][TD_TRACKS], deck_length[TD_DECKS][TD_TRACKS];
+    float deck_track_level[TD_DECKS][TD_TRACKS];
 } td_state_t;
 void td_get_state(td_state_t *s);
 /* the value a parameter has right now on a track, after locks, scenes and the LFO (for the knobs' arcs) */

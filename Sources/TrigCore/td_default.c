@@ -1281,7 +1281,14 @@ void td_default_project(void)
     E.gparam[G_COMP] = 40;
     E.gparam[G_FILTER] = 0;
     E.gparam[G_VOLUME] = 100;
-    E.cur = 0;
+    /* (DJ decks) deck A: P01 DEEP, on air and edited; deck B: P05 TECHNO, waiting */
+    for (int d = 0; d < TD_DECKS; d++) {
+        E.dk[d].pat = E.dk[d].dec_pat = d == 0 ? 0 : 4;
+        E.dk[d].queued = -1;
+        E.dk[d].playing = 0;
+    }
+    E.focus = E.on_air = 0;
+    td_sync_cur();
 }
 
 /* ---- sound packs: kits on a fixed voice map (after the Syntakt's machine designs: a pitched body with sweep and

@@ -354,27 +354,32 @@ static float ins_takeover(void)                                /* how much the i
 static void render_segment(float *out, int n)
 {
     float dry[TD_DECKS][2][TD_BLK], snd[TD_DECKS][3][2][TD_BLK];
-    float duck[TD_BLK];
+    float duck[TD_DECKS][TD_BLK];
     memset(dry, 0, sizeof dry);
     memset(snd, 0, sizeof snd);
     E.xf_s += (E.xf - E.xf_s) * fminf(1.f, (float)n * 0.004f);
     if (fabsf(E.xf_s - E.xf) < 1e-5f) E.xf_s = E.xf;
-    {   /* the sidechain: a fast attack on track 1's trigs, a release a fifth of a beat long */
+    {   /* each deck's sidechain: a fast attack on its track 1's trigs, a release a fifth of a beat long */
         float rel = tau_coef(60.f / E.bpm * 0.22f);
-        for (int i = 0; i < n; i++) {
-            if (E.duck_att) {
-                E.duck += 1.f / 144.f;
-                if (E.duck >= 1.f) { E.duck = 1.f; E.duck_att = 0; }
-            } else
-                E.duck *= rel;
-            duck[i] = E.duck;
-        }
+        for (int d = 0; d < TD_DECKS; d++)
+            for (int i = 0; i < n; i++) {
+                if (E.duck_att[d]) {
+                    E.duck[d] += 1.f / 144.f;
+                    if (E.duck[d] >= 1.f) { E.duck[d] = 1.f; E.duck_att[d] = 0; }
+                } else
+                    E.duck[d] *= rel;
+                duck[d][i] = E.duck[d];
+            }
     }
-    float sm = fminf(1.f, (float)n * 0.0042f);                 /* (per-segment step of a 5 ms smoother) */
-    (void)sm;
     float mdecay = expf(-(float)n / (0.3f * TD_SR));
-    for (int t = 0; t < TD_TRACKS; t++) {
+    for (int t = 0; t < TD_RT_TRACKS; t++) {                   /* (runtime tracks: deck * 8 + track) */
         td_track_t *tr = &E.trk[t];
+        int deck = RT_DECK(t);
+        if (!E.dk[deck].playing && tr->peak < 1e-7f) {         /* a stopped deck's silent track: nothing at all */
+            int any = 0;
+            for (int i = 0; i < TD_VOICES && !any; i++) any = tr->v[i].active;
+            if (!any) continue;
+        }
         td_track_eff(t);
         const float *e = tr->eff;
         float mono[TD_BLK];
@@ -405,8 +410,7 @@ static void render_segment(float *out, int n)
             tr->g_dly = tdl; tr->g_rev = trv; tr->g_cho = tch; tr->g_duck = tduck; tr->g_width = twid;
             continue;
         }
-        int deck = t / 4;
-        uint32_t wofs = 400u + (uint32_t)t * 37u;
+        uint32_t wofs = 400u + (uint32_t)RT_TR(t) * 37u;
         float pk = tr->peak * mdecay;
         for (int i = 0; i < n; i++) {
             float x = mono[i];
@@ -430,7 +434,7 @@ static void render_segment(float *out, int n)
             tr->g_cho += (tch - tr->g_cho) * k;
             tr->g_duck += (tduck - tr->g_duck) * k;
             tr->g_width += (twid - tr->g_width) * k;
-            x *= tr->g_level * tr->g_mute * (1.f - tr->g_duck * duck[i]);
+            x *= tr->g_level * tr->g_mute * (1.f - tr->g_duck * duck[deck][i]);
             float ax = fabsf(x);
             if (ax > pk) pk = ax;
             tr->wbuf[tr->wpos & (TD_WIDTH_BUF - 1u)] = x;
@@ -631,7 +635,7 @@ static void render_block(float *out)
     if (E.playing)
         E.gpos = g0 + TD_BLK * rate;
     E.frames_int += TD_BLK;
-    for (int t = 0; t < TD_TRACKS; t++) {                      /* MIDI note offs due in this block */
+    for (int t = 0; t < TD_RT_TRACKS; t++) {                   /* MIDI note offs due in this block */
         td_track_t *tr = &E.trk[t];
         if (tr->midi_note >= 0 && tr->midi_off >= 0 && tr->midi_off < f0 + TD_BLK) {
             td_midi_push((uint8_t)(0x80 | t), (uint8_t)tr->midi_note, 0, 3, tr->midi_off > f0 ? tr->midi_off : f0);
@@ -643,7 +647,7 @@ static void render_block(float *out)
 
 static void snap_gains(void)
 {
-    for (int t = 0; t < TD_TRACKS; t++) {
+    for (int t = 0; t < TD_RT_TRACKS; t++) {
         td_track_t *tr = &E.trk[t];
         td_track_eff(t);
         const float *e = tr->eff;
@@ -672,7 +676,6 @@ int td_init(void)
     memset(g_perf, 0, sizeof g_perf);
     E.bpm = 122.f;
     E.swing = 54;
-    E.queued = -1;
     E.xf = E.xf_s = 0.5f;
     E.rng = 0x2545F491u;
     E.midi_clock = 1;
@@ -681,7 +684,7 @@ int td_init(void)
     E.scale = 0;
     E.thr_d_target = E.thr_r_target = TD_TARGET_MASTER;
     E.thr_d_div = 2;
-    for (int t = 0; t < TD_TRACKS; t++) {
+    for (int t = 0; t < TD_RT_TRACKS; t++) {
         E.trk[t].midi_note = -1;
         E.trk[t].midi_off = -1;
         E.trk[t].lfo_rng = 0x51ED27u + (uint32_t)t * 7919u;
@@ -701,8 +704,7 @@ int td_init(void)
     td_fx_reset();
     td_samples_init();
     td_samples_builtin();
-    td_default_project();
-    E.dec_pat = E.cur;
+    td_default_project();                                      /* (it sets the decks' patterns) */
     E.inited = 1;
     snap_gains();
     td_unlock();
@@ -714,12 +716,10 @@ void td_project_new(void)
     td_play(0);
     td_lock();
     if (E.inited) {
-        for (int t = 0; t < TD_TRACKS; t++)
+        for (int t = 0; t < TD_RT_TRACKS; t++)
             for (int i = 0; i < TD_VOICES; i++) td_voice_fade(&E.trk[t].v[i], 5.f);
-        td_default_project();
+        td_default_project();                                  /* (it sets the decks' patterns) */
         memset(E.muted, 0, sizeof E.muted);
-        E.queued = -1;
-        E.dec_pat = E.cur;
     }
     td_unlock();
 }
@@ -779,17 +779,83 @@ void td_play(int on)
 {
     td_lock();
     if (E.inited) {
-        if (on && !E.playing) {
-            if (E.queued >= 0) { E.cur = E.queued; E.queued = -1; td_pattern_tempo(); }
+        if (on && !E.playing) {                                /* the deck on air starts (its queued pattern first) */
+            td_dk_t *dk = &E.dk[E.on_air];
+            if (dk->queued >= 0) { dk->pat = dk->queued; dk->queued = -1; td_pattern_tempo(); td_sync_cur(); }
+            for (int d = 0; d < TD_DECKS; d++) E.dk[d].playing = d == E.on_air;
             td_seq_reset_transport();
             E.playing = 1;
             if (E.midi_clock) td_midi_push(0xFA, 0, 0, 1, (int64_t)E.frames_int);
         } else if (!on && E.playing) {
             E.playing = 0;
+            for (int d = 0; d < TD_DECKS; d++) E.dk[d].playing = 0;
             td_seq_stop_notes();
             if (E.midi_clock) td_midi_push(0xFC, 0, 0, 1, (int64_t)E.frames_int);
         }
     }
+    td_unlock();
+}
+
+/* ---- (DJ decks) */
+static int ok_d(int d) { return d >= 0 && d < TD_DECKS && E.inited; }
+void td_deck_play(int deck, int on)
+{
+    td_lock();
+    if (ok_d(deck)) {
+        td_dk_t *dk = &E.dk[deck];
+        if (on && !E.playing) {                                /* the clock starts with this deck, at once */
+            E.on_air = deck;
+            td_pattern_tempo();
+            td_unlock();
+            td_play(1);
+            return;
+        }
+        if (on && !dk->playing) {                              /* the clock runs: on the next bar line, in time */
+            if (dk->queued >= 0) { dk->pat = dk->queued; dk->queued = -1; }
+            int64_t bar = ((E.kdec + 15) / 16) * 16;           /* (the first step not decided yet, to a bar line) */
+            dk->origin = dk->dec_origin = bar;
+            dk->dec_pat = dk->pat;
+            dk->playing = 1;
+            td_sync_cur();
+        } else if (!on && dk->playing) {
+            dk->playing = 0;
+            td_seq_stop_deck(deck);
+            int other = 1 - deck;
+            if (!E.dk[other].playing) {                        /* the last deck: the clock stops */
+                td_unlock();
+                td_play(0);
+                return;
+            }
+            if (E.on_air == deck) { E.on_air = other; td_pattern_tempo(); }
+        }
+    }
+    td_unlock();
+}
+void td_deck_pattern(int deck, int pattern)
+{
+    td_lock();
+    if (ok_d(deck) && pattern >= 0 && pattern < TD_PATTERNS) {
+        td_dk_t *dk = &E.dk[deck];
+        if (!E.playing || !dk->playing) {                      /* stopped: at once */
+            dk->pat = dk->dec_pat = pattern;
+            dk->queued = -1;
+            if (deck == E.on_air) td_pattern_tempo();
+            td_sync_cur();
+        } else
+            dk->queued = pattern == dk->pat ? -1 : pattern;
+    }
+    td_unlock();
+}
+void td_focus(int deck)
+{
+    td_lock();
+    if (ok_d(deck)) { E.focus = deck; td_sync_cur(); }
+    td_unlock();
+}
+void td_on_air(int deck)
+{
+    td_lock();
+    if (ok_d(deck) && deck != E.on_air) { E.on_air = deck; td_pattern_tempo(); }
     td_unlock();
 }
 void td_restart(void)
@@ -806,7 +872,8 @@ void td_set_tempo(float bpm)
     td_lock();
     if (bpm == bpm) {
         E.bpm = clampf(bpm, 30.f, 300.f);
-        if (E.pat[E.cur].bpm10) E.pat[E.cur].bpm10 = (uint16_t)lroundf(E.bpm * 10.f);   /* (it edits the pattern's own) */
+        td_pattern_t *P = &E.pat[E.dk[E.on_air].pat];           /* (it edits the tempo of the pattern heard) */
+        if (P->bpm10) P->bpm10 = (uint16_t)lroundf(E.bpm * 10.f);
     }
     td_unlock();
 }
@@ -904,10 +971,11 @@ void td_set_machine(int track, int machine)
 {
     td_lock();
     if (ok_t(track) && machine >= 0 && machine < TD_MACHINES && E.pat[E.cur].machine[track] != machine) {
+        td_track_t *tr = &E.trk[td_rt(track)];                 /* (the deck edited's track) */
         for (int i = 0; i < TD_VOICES; i++)
-            td_voice_fade(&E.trk[track].v[i], 5.f);
+            td_voice_fade(&tr->v[i], 5.f);
         td_set_machine_x(&E.pat[E.cur], track, machine);
-        E.trk[track].lk_mask = 0;
+        tr->lk_mask = 0;
     }
     td_unlock();
 }
@@ -938,7 +1006,7 @@ int td_param_live(int track, int param)
     td_lock();
     int v = 0;
     if (ok_t(track) && param >= 0 && param < TD_NPARAMS) {
-        float f = td_param_live_f(track, param);
+        float f = td_param_live_f(td_rt(track), param);
         v = (int)lroundf(f);
     }
     td_unlock();
@@ -948,8 +1016,8 @@ void td_mute(int track, int on)
 {
     td_lock();
     if (ok_t(track)) {
-        E.muted[track] = on != 0;
-        E.ap.override[track] = 1;                              /* the user's word stands for the rest of the phrase */
+        E.muted[td_rt(track)] = on != 0;
+        E.ap.override[td_rt(track)] = 1;                       /* the user's word stands for the rest of the phrase */
     }
     td_unlock();
 }
@@ -979,14 +1047,15 @@ void td_trigger(int track, int note, int velocity)
     if (ok_t(track)) {
         note = clampi(note, 0, 127);
         velocity = clampi(velocity, 1, 127);
-        td_track_eff(track);
+        int rt = td_rt(track);                                 /* (played on the deck edited) */
+        td_track_eff(rt);
         float x = velocity / 127.f;
-        td_note_on(track, note, x * sqrtf(x), -1, NF_LIVE);
-        if (track == 0) E.duck_att = 1;
-        if (E.recording && E.playing) {                        /* live recording: the nearest step */
+        td_note_on(rt, note, x * sqrtf(x), -1, NF_LIVE);
+        if (track == 0) E.duck_att[E.focus] = 1;
+        if (E.recording && E.playing && E.dk[E.focus].playing) {   /* live recording: the nearest step */
             td_pattern_t *P = &E.pat[E.cur];
             int len = P->length[track];
-            int64_t k = (int64_t)floor(E.gpos - (double)E.cur_origin + 0.5);
+            int64_t k = (int64_t)floor(E.gpos - (double)E.dk[E.focus].origin + 0.5);
             int s = (int)(((k % len) + len) % len);
             td_step_t *st = &P->step[track][s];
             if (!st->trig) {
@@ -1007,7 +1076,7 @@ void td_release(int track, int note)
     td_lock();
     if (ok_t(track))
         for (int i = 0; i < TD_VOICES; i++) {
-            td_voice_t *v = &E.trk[track].v[i];
+            td_voice_t *v = &E.trk[td_rt(track)].v[i];
             if (v->active && v->live_note == note && v->gated)
                 td_voice_gate_off(v);
         }
@@ -1015,19 +1084,7 @@ void td_release(int track, int note)
 }
 
 /* ---- patterns */
-void td_pattern_queue(int pattern)
-{
-    td_lock();
-    if (E.inited && pattern >= 0 && pattern < TD_PATTERNS) {
-        if (!E.playing) {
-            E.cur = E.dec_pat = pattern;
-            E.queued = -1;
-            td_pattern_tempo();
-        } else
-            E.queued = pattern;
-    }
-    td_unlock();
-}
+void td_pattern_queue(int pattern) { td_deck_pattern(E.focus, pattern); }   /* (the deck edited) */
 void td_pattern_copy(int from, int to)
 {
     td_lock();
@@ -1197,22 +1254,38 @@ void td_get_state(td_state_t *s)
     memset(s, 0, sizeof *s);
     td_lock();
     if (E.inited) {
-        const td_pattern_t *P = &E.pat[E.cur];
         s->playing = E.playing;
         s->recording = E.recording;
         s->fill = E.fill_user || (E.ap.on && E.ap.fill);
-        s->pattern = E.cur;
-        s->queued_pattern = E.queued;
         s->bpm = E.bpm;
         s->swing = E.swing;
-        int64_t kp = (int64_t)floor(E.gpos - (double)E.cur_origin);
+        s->focus = E.focus;
+        s->on_air = E.on_air;
+        for (int d = 0; d < TD_DECKS; d++) {                   /* both decks; the old fields: the deck edited */
+            const td_dk_t *dk = &E.dk[d];
+            const td_pattern_t *P = &E.pat[dk->pat];
+            s->deck_pattern[d] = dk->pat;
+            s->deck_queued[d] = dk->queued;
+            s->deck_playing[d] = E.playing && dk->playing;
+            int64_t kp = (int64_t)floor(E.gpos - (double)dk->origin);
+            for (int t = 0; t < TD_TRACKS; t++) {
+                int len = P->length[t] ? P->length[t] : 16, rt = d * TD_TRACKS + t;
+                s->deck_step[d][t] = s->deck_playing[d] && kp >= 0 ? (int32_t)(kp % len) : -1;
+                s->deck_machine[d][t] = P->machine[t];
+                s->deck_muted[d][t] = td_eff_muted(rt);
+                s->deck_length[d][t] = len;
+                s->deck_track_level[d][t] = fminf(1.f, E.trk[rt].peak);
+            }
+        }
+        int f = E.focus;
+        s->pattern = E.dk[f].pat;
+        s->queued_pattern = E.dk[f].queued;
         for (int t = 0; t < TD_TRACKS; t++) {
-            int len = P->length[t] ? P->length[t] : 16;
-            s->step[t] = E.playing && kp >= 0 ? (int32_t)(kp % len) : -1;
-            s->machine[t] = P->machine[t];
-            s->muted[t] = td_eff_muted(t);
-            s->length[t] = len;
-            s->level[t] = fminf(1.f, E.trk[t].peak);
+            s->step[t] = s->deck_step[f][t];
+            s->machine[t] = s->deck_machine[f][t];
+            s->muted[t] = s->deck_muted[f][t];
+            s->length[t] = s->deck_length[f][t];
+            s->level[t] = s->deck_track_level[f][t];
         }
         for (int d = 0; d < TD_DECKS; d++) {
             s->deck_level[d] = fminf(1.f, E.deck[d].meter);

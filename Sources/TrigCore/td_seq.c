@@ -58,19 +58,20 @@ void td_midi_push(uint8_t a, uint8_t b, uint8_t c, int n, int64_t frame)
     E.mq_n++;
 }
 
-/* ---- effective parameters */
+/* ---- effective parameters (t: a runtime track; its deck's pattern, track t % 8) */
 static void apply_scene(int t, float *eff, float x)
 {
-    td_pattern_t *P = &E.pat[E.cur];
-    int sc;
+    td_pattern_t *P = RT_PAT(t);
+    int pt = RT_TR(t), sc;
     float amt;
+    if (RT_DECK(t) != E.on_air) return;                        /* (the crossfader's scenes: the deck on air's) */
     if (x < 0.4999f) { sc = 0; amt = (0.5f - x) * 2.f; }
     else if (x > 0.5001f) { sc = 1; amt = (x - 0.5f) * 2.f; }
     else return;
     if (amt > 1.f) amt = 1.f;
     for (int i = 0; i < P->nscene[sc]; i++) {
         const td_scene_ent_t *s = &P->scene[sc][i];
-        if (s->track == t && s->param < TD_NPARAMS)
+        if (s->track == pt && s->param < TD_NPARAMS)
             eff[s->param] += ((float)s->value - eff[s->param]) * amt;
     }
 }
@@ -78,10 +79,10 @@ static void compute_eff(int t, float *eff, float xf, int with_lfo)
 {
     ptab_init();
     td_track_t *tr = &E.trk[t];
-    td_pattern_t *P = &E.pat[E.cur];
-    int m = P->machine[t];
+    td_pattern_t *P = RT_PAT(t);
+    int pt = RT_TR(t), m = P->machine[pt];
     for (int p = 0; p < TD_NPARAMS; p++)
-        eff[p] = (tr->lk_mask >> p) & 1u ? (float)tr->lk_val[p] : (float)P->param[t][p];
+        eff[p] = (tr->lk_mask >> p) & 1u ? (float)tr->lk_val[p] : (float)P->param[pt][p];
     apply_scene(t, eff, xf);
     eff[P_CUT] += E.ap.walk[t][0] + E.ap.cut_ramp[t];
     eff[P_DLY] += E.ap.walk[t][1];
@@ -152,7 +153,7 @@ void td_lfo_advance(int t, int n, double rate)
         lvl = fade < 0.f ? tr->lfo_fade : 1.f - tr->lfo_fade;
     }
     int dest = (int)(e[P_LDEST] + 0.5f);
-    int m = E.pat[E.cur].machine[t];
+    int m = RT_PAT(t)->machine[RT_TR(t)];
     float range = dest > 0 ? pmax[m][TD_SLOTS + dest - 1] - pmin[m][TD_SLOTS + dest - 1] : 0.f;
     tr->lfo_out = out * lvl;
     tr->lfo_mod = out * lvl * e[P_LDEPTH] * (1.f / 64.f) * range * 0.5f;
@@ -177,8 +178,8 @@ static td_voice_t *alloc_voice(td_track_t *tr)
 }
 void td_note_on(int t, int note, float vel, int32_t gate, int flags)
 {
-    td_track_t *tr = &E.trk[t];
-    int m = E.pat[E.cur].machine[t];
+    td_track_t *tr = &E.trk[t];                                /* (t: a runtime track) */
+    int m = RT_PAT(t)->machine[RT_TR(t)];
     const float *e = tr->eff;
     int accent = (flags & NF_ACCENT) != 0;
     tr->age++;
@@ -276,17 +277,20 @@ static void ev_push(double t, int type, int track, int pat, int step, int32_t lo
     e->step = (uint8_t)step;
     e->loop = loop;
 }
-static void decide_step(int64_t k)
+static void decide_deck(int d, int64_t k)
 {
-    td_pattern_t *P = &E.pat[E.dec_pat];
-    int64_t kp = k - E.dec_origin;
+    td_dk_t *dk = &E.dk[d];
+    int64_t kp = k - dk->dec_origin;
+    if (!dk->playing || kp < 0)                                /* (stopped, or starting on a later bar line) */
+        return;
+    td_pattern_t *P = &E.pat[dk->dec_pat];
     int ml = td_master_len(P);
-    if (kp > 0 && kp % ml == 0 && E.queued >= 0) {             /* the end of the pattern: the queued one starts */
-        ev_push((double)k, EV_SWITCH, 0, E.queued, 0, 0);
-        E.dec_pat = E.queued;
-        E.dec_origin = k;
+    if (kp > 0 && kp % ml == 0 && dk->queued >= 0) {           /* the end of the pattern: the queued one starts */
+        ev_push((double)k, EV_SWITCH, d, dk->queued, 0, 0);
+        dk->dec_pat = dk->queued;
+        dk->dec_origin = k;
         kp = 0;
-        P = &E.pat[E.dec_pat];
+        P = &E.pat[dk->dec_pat];
     }
     for (int t = 0; t < TD_TRACKS; t++) {
         int len = P->length[t] ? P->length[t] : 16;
@@ -298,8 +302,12 @@ static void decide_step(int64_t k)
         double sw = (s & 1) ? ((double)E.swing / 50.0 - 1.0) : 0.0;
         double tt = (double)k + sw + (double)st->micro / 24.0;
         if (tt < E.gpos) tt = E.gpos;
-        ev_push(tt, st->trig ? EV_TRIG : EV_LOCK, t, E.dec_pat, s, loop);
+        ev_push(tt, st->trig ? EV_TRIG : EV_LOCK, d * TD_TRACKS + t, dk->dec_pat, s, loop);
     }
+}
+static void decide_step(int64_t k)
+{
+    for (int d = 0; d < TD_DECKS; d++) decide_deck(d, k);
 }
 
 /* the frame of this block an event falls on: the first frame at or after its time (a large number: a later block) */
@@ -319,7 +327,7 @@ void td_seq_block(double g0, double rate, td_event_t *out, int *off, int *nout, 
     double g1 = g0 + TD_BLK * rate;
     while ((double)(E.kdec - 1) < g1)
         decide_step(E.kdec++);
-    for (int t = 0; t < TD_TRACKS; t++) {
+    for (int t = 0; t < TD_RT_TRACKS; t++) {
         td_track_t *tr = &E.trk[t];
         int o;
         while (tr->rt_left > 0 && (o = ev_off(tr->rt_next, g0, rate)) < TD_BLK && n < max) {
@@ -384,11 +392,11 @@ static void release_seq(int t)
 
 static void fire_trig(const td_event_t *ev, int64_t frame)
 {
-    int t = ev->track;
+    int t = ev->track, pt = RT_TR(t);                          /* (a runtime track; its pattern's track) */
     td_track_t *tr = &E.trk[t];
     td_pattern_t *P = &E.pat[ev->pat];
-    const td_step_t *st = &P->step[t][ev->step];
-    int m = E.pat[E.cur].machine[t];
+    const td_step_t *st = &P->step[pt][ev->step];
+    int m = P->machine[pt];
     if (!st->trig)
         return;
     if (td_eff_muted(t) || !cond_ok(st->cond, ev->loop)) {
@@ -397,7 +405,7 @@ static void fire_trig(const td_event_t *ev, int64_t frame)
     }
     tr->lk_mask = 0;
     for (int i = 0; i < st->nlocks && i < TD_LPS; i++) {
-        const td_lock_t *l = &P->lock[t][ev->step][i];
+        const td_lock_t *l = &P->lock[pt][ev->step][i];
         if (l->param < TD_NPARAMS) {
             tr->lk_val[l->param] = l->value;
             tr->lk_mask |= 1ull << l->param;
@@ -427,8 +435,8 @@ static void fire_trig(const td_event_t *ev, int64_t frame)
     tr->rt_fade = e[P_RVEL] * (1.f / 64.f);
     tr->rt_accent = st->accent;
     lfo_trig(t);
-    if (t == 0)
-        E.duck_att = 1;
+    if (pt == 0)                                               /* (track 1 keys its own deck's sidechain) */
+        E.duck_att[RT_DECK(t)] = 1;
     midi_note(t, note, (int)(st->vel * (st->accent ? 1.25f : 1.f)), frame, gate);
 }
 static void fire_retrig(const td_event_t *ev, int64_t frame)
@@ -442,19 +450,19 @@ static void fire_retrig(const td_event_t *ev, int64_t frame)
     float vel = tr->rt_vel * fmaxf(0.02f, k);
     int32_t gate = (int32_t)(tr->rt_int * td_frames_per_step());
     td_note_on(t, tr->rt_note, vel, gate, NF_SEQ | (tr->rt_accent ? NF_ACCENT : 0));
-    if (t == 0)
-        E.duck_att = 1;
+    if (RT_TR(t) == 0)
+        E.duck_att[RT_DECK(t)] = 1;
     float v127 = powf(clampf(vel, 0.f, 1.f), 1.f / 1.5f) * 127.f;
     midi_note(t, tr->rt_note, (int)v127, frame, gate);
 }
 static void fire_locks(const td_event_t *ev)
 {
-    int t = ev->track;
+    int t = ev->track, pt = RT_TR(t);
     td_track_t *tr = &E.trk[t];
     td_pattern_t *P = &E.pat[ev->pat];
-    const td_step_t *st = &P->step[t][ev->step];
+    const td_step_t *st = &P->step[pt][ev->step];
     for (int i = 0; i < st->nlocks && i < TD_LPS; i++) {
-        const td_lock_t *l = &P->lock[t][ev->step][i];
+        const td_lock_t *l = &P->lock[pt][ev->step][i];
         if (l->param < TD_NPARAMS) {
             tr->lk_val[l->param] = l->value;
             tr->lk_mask |= 1ull << l->param;
@@ -465,13 +473,16 @@ static void fire_locks(const td_event_t *ev)
 void td_seq_apply(const td_event_t *ev, int64_t frame)
 {
     switch (ev->type) {
-    case EV_SWITCH:
-        E.cur = ev->pat;
-        td_pattern_tempo();
-        E.cur_origin = (int64_t)llround(ev->t);
-        if (E.queued == ev->pat)
-            E.queued = -1;
+    case EV_SWITCH: {                                          /* (track: the deck) */
+        td_dk_t *dk = &E.dk[ev->track];
+        dk->pat = ev->pat;
+        dk->origin = (int64_t)llround(ev->t);
+        if (dk->queued == ev->pat)
+            dk->queued = -1;
+        if (ev->track == E.on_air) td_pattern_tempo();
+        td_sync_cur();
         break;
+    }
     case EV_BAR:
         memmove(&E.bar_frame[1], &E.bar_frame[0], sizeof(E.bar_frame[0]) * 7);
         E.bar_frame[0] = frame;
@@ -488,9 +499,11 @@ void td_seq_apply(const td_event_t *ev, int64_t frame)
     }
 }
 
-void td_seq_stop_notes(void)
+/* one deck's notes released, its retrigs and scheduled events dropped (the deck stops; the clock may run on) */
+void td_seq_stop_deck(int d)
 {
-    for (int t = 0; t < TD_TRACKS; t++) {
+    for (int pt = 0; pt < TD_TRACKS; pt++) {
+        int t = d * TD_TRACKS + pt;
         td_track_t *tr = &E.trk[t];
         release_seq(t);
         tr->rt_left = 0;
@@ -499,6 +512,16 @@ void td_seq_stop_notes(void)
             td_midi_push((uint8_t)(0x80 | t), (uint8_t)tr->midi_note, 0, 3, (int64_t)E.frames_int);
         tr->midi_note = -1;
     }
+    for (int i = 0; i < E.nev;) {
+        const td_event_t *e = &E.ev[i];
+        int mine = e->type == EV_SWITCH ? e->track == d : (e->type == EV_TRIG || e->type == EV_LOCK) && RT_DECK(e->track) == d;
+        if (mine) E.ev[i] = E.ev[--E.nev];
+        else i++;
+    }
+}
+void td_seq_stop_notes(void)
+{
+    for (int d = 0; d < TD_DECKS; d++) td_seq_stop_deck(d);
     E.nev = 0;
 }
 void td_seq_reset_transport(void)
@@ -507,12 +530,13 @@ void td_seq_reset_transport(void)
     E.kdec = 0;
     E.next_bar = 0;
     E.next_clk = 0;
-    E.cur_origin = 0;
-    E.dec_pat = E.cur;
-    E.dec_origin = 0;
+    for (int d = 0; d < TD_DECKS; d++) {
+        E.dk[d].origin = E.dk[d].dec_origin = 0;
+        E.dk[d].dec_pat = E.dk[d].pat;
+    }
     E.nev = 0;
     E.nbar = 0;
-    for (int t = 0; t < TD_TRACKS; t++) {
+    for (int t = 0; t < TD_RT_TRACKS; t++) {
         E.trk[t].rt_left = 0;
         E.trk[t].slide_pending = 0;
     }
@@ -592,47 +616,49 @@ static void ap_phrase(td_auto_t *a)
     a->phrases++;
     (void)P;
 }
-static void ap_walk(td_auto_t *a)
+static void ap_walk(td_auto_t *a)                              /* (the deck on air's tracks) */
 {
-    td_pattern_t *P = &E.pat[E.cur];
+    td_pattern_t *P = &E.pat[E.dk[E.on_air].pat];
+    int base = E.on_air * TD_TRACKS;
     for (int t = 0; t < TD_TRACKS; t++) {
         int m = P->machine[t];
-        float *w = a->walk_t[t];
+        float *w = a->walk_t[base + t];
         int walk_cut = m == TD_M_SYNTH || m == TD_M_FM || m == TD_M_HAT;
         w[0] = walk_cut ? clampf(w[0] * 0.8f + (td_rand01(&a->rng) - 0.5f) * 10.f, -16.f, 16.f) : 0.f;
         w[1] = P->param[t][P_DLY] > 0 ? clampf(w[1] * 0.8f + (td_rand01(&a->rng) - 0.5f) * 12.f, -20.f, 20.f) : 0.f;
         w[2] = m == TD_M_FM ? clampf(w[2] * 0.8f + (td_rand01(&a->rng) - 0.5f) * 12.f, -18.f, 18.f) : 0.f;
     }
 }
-static void ap_bar(td_auto_t *a, int pb)
+static void ap_bar(td_auto_t *a, int pb)                       /* (the deck on air's tracks: base + 0..7) */
 {
-    td_pattern_t *P = &E.pat[E.cur];
+    td_pattern_t *P = &E.pat[E.dk[E.on_air].pat];
+    int base = E.on_air * TD_TRACKS;
     memset(a->mute, 0, sizeof a->mute);
     a->fill = 0;
     a->dfb_t = 0.f;
-    for (int t = 0; t < TD_TRACKS; t++) a->cut_ramp_t[t] = 0.f;
+    for (int t = 0; t < TD_RT_TRACKS; t++) a->cut_ramp_t[t] = 0.f;
     switch (a->kind) {
     case AP_DROP:
-        if (pb >= 8 - a->drop_bars) a->mute[0] = 1;
+        if (pb >= 8 - a->drop_bars) a->mute[base] = 1;
         a->fill = pb == 7;
         break;
     case AP_BREAK:
         for (int t = 0; t < TD_TRACKS; t++) {
-            int deck_a = t < 4, m = P->machine[t];
-            if (pb < 4 && deck_a && m != TD_M_HAT) a->mute[t] = 1;          /* breakdown: deck A but the hats */
-            if (pb >= 4 && t == 0) a->mute[t] = 1;                           /* build: no kick yet */
-            if (!deck_a && slides(m))
-                a->cut_ramp_t[t] = pb < 4 ? -28.f + 8.f * (float)pb : 4.f * (float)(pb - 3);
+            int drums = t < 4, m = P->machine[t];                           /* (tracks 1-4: the drums) */
+            if (pb < 4 && drums && m != TD_M_HAT) a->mute[base + t] = 1;    /* breakdown: the drums but the hats */
+            if (pb >= 4 && t == 0) a->mute[base + t] = 1;                    /* build: no kick yet */
+            if (!drums && slides(m))
+                a->cut_ramp_t[base + t] = pb < 4 ? -28.f + 8.f * (float)pb : 4.f * (float)(pb - 3);
         }
         if (pb >= 4) a->dfb_t = 8.f * (float)(pb - 3);
         a->fill = pb == 7;
         break;
     case AP_BUILD:
         for (int t = 4; t < TD_TRACKS; t++)
-            if (slides(P->machine[t])) a->cut_ramp_t[t] = 2.5f * (float)pb;
+            if (slides(P->machine[t])) a->cut_ramp_t[base + t] = 2.5f * (float)pb;
         a->dfb_t = 3.5f * (float)pb;
         a->fill = pb >= 6;
-        if (pb == 7) a->mute[0] = 1;
+        if (pb == 7) a->mute[base] = 1;
         break;
     default:
         a->fill = pb == 7 && a->fill_bar;
@@ -656,7 +682,7 @@ void td_auto_bar(int64_t bar)
 void td_auto_block(void)
 {
     td_auto_t *a = &E.ap;
-    for (int t = 0; t < TD_TRACKS; t++) {
+    for (int t = 0; t < TD_RT_TRACKS; t++) {
         for (int i = 0; i < 3; i++) {
             float tgt = a->on ? a->walk_t[t][i] : 0.f;
             a->walk[t][i] += (tgt - a->walk[t][i]) * 0.0012f;

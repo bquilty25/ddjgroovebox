@@ -13,7 +13,7 @@
  * magic or version, a wrong length, a bad CRC or anything that does not parse is refused and nothing changes. */
 #include "td_internal.h"
 
-#define TD_PROJ_VERSION 3                                     /* (2: each pattern's tempo; 3: its name; 1, 2 still load) */
+#define TD_PROJ_VERSION 4                                     /* (2: each pattern's tempo; 3: its name; 4: the decks) */
 #define HDR 16
 
 uint32_t td_crc32(const void *data, size_t n)
@@ -57,13 +57,13 @@ int td_project_save(void *buf, size_t n)
     wr_t w = {(uint8_t *)buf, n, HDR, 0};
     w16(&w, (int)lroundf(E.bpm * 10.f));
     w8(&w, E.swing);
-    w8(&w, E.cur);
+    w8(&w, E.dk[0].pat);                                       /* (v4: deck A's pattern) */
     w8(&w, E.scale_root);
     w8(&w, E.scale);
     int mutes = 0;
-    for (int t = 0; t < TD_TRACKS; t++) mutes |= E.muted[t] ? 1 << t : 0;
+    for (int t = 0; t < TD_TRACKS; t++) mutes |= E.muted[t] ? 1 << t : 0;   /* (deck A's) */
     w8(&w, mutes);
-    w8(&w, 0);
+    w8(&w, (E.dk[1].pat & 15) | (E.focus ? 16 : 0) | (E.on_air ? 32 : 0));   /* (v4: deck B's pattern, focus, on air) */
     for (int s = 0; s < TD_SLOTS; s++) w16(&w, E.gparam[s]);
     for (int pi = 0; pi < TD_PATTERNS; pi++) {
         const td_pattern_t *P = &E.pat[pi];
@@ -125,7 +125,7 @@ int td_project_load(const void *buf, size_t n)
     rd_t r = {h, n, HDR, 0};
     float bpm = (float)(uint16_t)r16(&r) * 0.1f;
     int swing = r8(&r), cur = r8(&r), root = r8(&r), scale = r8(&r), mutes = r8(&r);
-    r8(&r);
+    int decks = r8(&r);                                        /* (v4: deck B's pattern, focus, on air; before: 0) */
     int16_t gp[TD_SLOTS];
     for (int s = 0; s < TD_SLOTS; s++) {
         const td_pdesc_t *d = td_gdesc(s);
@@ -197,14 +197,22 @@ int td_project_load(const void *buf, size_t n)
     memcpy(E.pat, g_tmp_pat, sizeof E.pat);
     E.bpm = clampf(bpm, 30.f, 300.f);
     E.swing = clampi(swing, 50, 80);
-    E.cur = clampi(cur, 0, TD_PATTERNS - 1);
-    E.queued = -1;
+    E.dk[0].pat = clampi(cur, 0, TD_PATTERNS - 1);
+    if (version >= 4) {
+        E.dk[1].pat = decks & 15;
+        E.focus = (decks >> 4) & 1;
+        E.on_air = (decks >> 5) & 1;
+    } else {                                                   /* (older: deck B gets the next pattern) */
+        E.dk[1].pat = (E.dk[0].pat + 1) % TD_PATTERNS;
+        E.focus = E.on_air = 0;
+    }
+    for (int d = 0; d < TD_DECKS; d++) { E.dk[d].queued = -1; E.dk[d].dec_pat = E.dk[d].pat; }
+    td_sync_cur();
     E.scale_root = clampi(root, 0, 11);
     E.scale = clampi(scale, 0, 7);
-    for (int t = 0; t < TD_TRACKS; t++) {
-        E.muted[t] = (uint8_t)((mutes >> t) & 1);
-        E.trk[t].lk_mask = 0;
-    }
+    memset(E.muted, 0, sizeof E.muted);
+    for (int t = 0; t < TD_TRACKS; t++) E.muted[t] = (uint8_t)((mutes >> t) & 1);
+    for (int t = 0; t < TD_RT_TRACKS; t++) E.trk[t].lk_mask = 0;
     memcpy(E.gparam, gp, sizeof gp);
     td_seq_reset_transport();                                  /* (playing on from the start of the loaded pattern) */
     td_unlock();

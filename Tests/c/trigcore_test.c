@@ -275,6 +275,57 @@ TEST(test_locks)
 }
 
 /* ---- patterns */
+/* (DJ decks) two decks, two patterns, one clock; editing follows the deck edited */
+TEST(test_decks)
+{
+    setup_empty(120);                                          /* deck A: P13 (empty) */
+    for (int s = 0; s < 16; s += 4) td_step_note(0, s, 36, 100);   /* deck A: a note each beat */
+    td_deck_pattern(1, 13);                                    /* deck B: P14 */
+    E.pat[13].bpm10 = 1300;
+    td_focus(1);
+    for (int s = 0; s < 16; s += 2) td_step_note(0, s, 50, 100);   /* deck B: eighths, edited through the API */
+    check("editing follows the deck edited (P14 on B; P13 untouched)", E.pat[13].step[0][2].trig && !E.pat[12].step[0][2].trig);
+    td_focus(0);
+    td_play(1);
+    render_frames(96000, 128);                                 /* one bar at 120 BPM */
+    td_state_t st;
+    td_get_state(&st);
+    check("PLAY: the deck on air plays, the other waits", st.deck_playing[0] && !st.deck_playing[1] && count_ch(0) == 4
+          && count_ch(8) == 0);
+    render_frames(24000, 128);                                 /* a beat into bar 2 */
+    td_deck_play(1, 1);
+    check("deck B starts on the next bar line (step 32)", E.dk[1].origin == 32);
+    render_frames(96000 * 2 - 24000, 128);                     /* to the end of bar 3 */
+    int64_t firstB = -1;
+    for (int i = 0; i < nnotes; i++)
+        if (notes[i].ch == 8) { firstB = notes[i].frame; break; }
+    char msg[120];
+    snprintf(msg, sizeof msg, "its first note: on the bar line (frame %lld, 192000)", (long long)firstB);
+    check(msg, firstB == 192000);
+    td_get_state(&st);
+    check("both decks play their own patterns, in time", st.deck_playing[0] && st.deck_playing[1] && st.deck_pattern[0] == 12
+          && st.deck_pattern[1] == 13 && count_ch(8) == 8 && count_ch(0) == 12);
+    int a_before = count_ch(0);
+    td_deck_play(0, 0);
+    td_get_state(&st);
+    check("deck A stopped: B is on air, with its own tempo (130)", st.on_air == 1 && fabsf(st.bpm - 130.f) < 0.01f
+          && !st.deck_playing[0] && st.playing);
+    render_frames(48000, 128);
+    check("deck A silent, deck B playing on", count_ch(0) == a_before && count_ch(8) > 8);
+    /* the project keeps the decks */
+    td_focus(1);
+    size_t n = td_project_size();
+    uint8_t *a = malloc(n);
+    int na = td_project_save(a, n);
+    td_init();
+    check("a project loads its decks (A: P13, B: P14, B edited and on air)", td_project_load(a, (size_t)na) == 0
+          && E.dk[0].pat == 12 && E.dk[1].pat == 13 && E.focus == 1 && E.on_air == 1 && E.cur == 13);
+    free(a);
+    td_deck_play(1, 0);
+    td_get_state(&st);
+    check("the last deck stopped: the clock stops", !st.playing);
+}
+
 TEST(test_pattern_queue)
 {
     setup_empty(120);
@@ -869,12 +920,13 @@ TEST(test_acid_chord_duck)
     td_param_set(4, P_DUCK, 127);
     td_trigger(4, 45, 100);
     td_release(0, 57);
-    td_deck_level(0, 0.f);                                     /* (the kick itself out of the way) */
+    td_param_set(0, P_LEVEL, 0);                               /* (track 1 out of the way) */
     td_render_offline(24000);
     td_render(b, 4800, 0);
     float before_pk = 0;
     for (int i = 0; i < 9600; i++) before_pk = fmaxf(before_pk, fabsf(b[i]));
     td_set_machine(0, TD_M_KICK);
+    td_param_set(0, P_LEVEL, 0);                               /* (the kick unheard: it still ducks; its deck holds the sub) */
     td_trigger(0, 60, 120);
     td_render(b, 1200, 0);                                     /* 25 ms after the kick */
     float dip = 0;
@@ -1314,6 +1366,7 @@ int main(void)
     RUN(test_conditions);
     RUN(test_locks);
     RUN(test_pattern_queue);
+    RUN(test_decks);
     RUN(test_scenes);
     RUN(test_scratch);
     RUN(test_perf);

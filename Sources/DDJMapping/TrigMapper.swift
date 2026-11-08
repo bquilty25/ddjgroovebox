@@ -501,7 +501,7 @@ public final class TrigMapper {
         if page == .master {
             guard let info = model.globalInfo(slot: slot) else { return ControlFace(title: "—", color: color) }
             let v = model.globalValue(slot: slot)
-            return ControlFace(title: info.shortName, value: model.format(info, v), arc: arc(info, v), color: color)
+            return ControlFace(title: info.name, value: model.format(info, v), arc: arc(info, v), color: color)
         }
         let p = param(slot)
         guard let info = model.info(track: track, param: p) else { return ControlFace(title: "—", color: color) }
@@ -513,7 +513,8 @@ public final class TrigMapper {
         } else if let st = heldSteps.first {
             if let l = model.lock(track: track, step: st, param: p) { v = l; badge = "LOCK" } else { v = model.value(track: track, param: p) }
         }
-        return ControlFace(title: info.shortName, value: model.format(info, v), arc: arc(info, v), color: color, badge: badge)
+        // the full name: the mixer has room for it (CUTOFF, not CUT)
+        return ControlFace(title: info.name, value: model.format(info, v), arc: arc(info, v), color: color, badge: badge)
     }
 
     private func arc(_ info: ParamInfo, _ v: Int) -> Double {

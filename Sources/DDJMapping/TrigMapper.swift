@@ -135,8 +135,12 @@ public final class TrigMapper {
             return setLength(min(64, (model.length(track) / 16 + 1) * 16))
         case (.callLeft(.right), .press(true)): stepPage = max(0, stepPage - 1); return []
         case (.callRight(.right), .press(true)): stepPage = min(pageCount - 1, stepPage + 1); return []
-        case (.browse, .relative(let n)) where e.shifted && held.isEmpty && heldTrackPads.isEmpty:   // SHIFT: one step
-            return setLength(min(64, max(1, model.length(track) + n)))
+        case (.browse, .relative(let n)) where e.shifted && held.isEmpty && heldTrackPads.isEmpty:
+            if page == .src {                            // SHIFT on the SRC page: the active track's machine
+                let k = Machine.allCases.count
+                return [.machine(track: track, machine: ((model.machine(track).rawValue + n) % k + k) % k)]
+            }
+            return setLength(min(64, max(1, model.length(track) + n)))   // SHIFT elsewhere: the length, a step at a time
         case (.load(let d), .press(true)):
             if !held.isEmpty {                           // a step held: LOAD left = slide, right = accent (acid)
                 let first = model.step(track: track, step: heldSteps[0])
@@ -146,9 +150,17 @@ public final class TrigMapper {
                                       : .stepAccent(track: track, step: st, on: !first.accent)
                 }
             }
-            // (DJ decks) LOAD: the deck's next pattern (SHIFT: the previous), at once if it is stopped, else at its end
-            let deck = d.rawValue, base = model.deckQueued(deck) ?? model.deckPattern(deck)
-            return [.deckPattern(deck: deck, pattern: (base + (e.shifted ? 15 : 1)) % 16)]
+            // (DJ decks) LOAD: the pattern chosen with BROWSE onto the deck (SHIFT: the deck's next pattern); at once if
+            // the deck is stopped, else at the end of its pattern
+            let deck = d.rawValue
+            if e.shifted {
+                let base = model.deckQueued(deck) ?? model.deckPattern(deck)
+                return [.deckPattern(deck: deck, pattern: (base + 1) % 16)]
+            }
+            let p = now() - patternBrowsed < 60 ? patternCursor : model.deckPattern(1 - model.onAir)
+            patternLoaded = (p, deck, now())
+            patternBrowsed = now()                       // (the list shows it going in)
+            return [.deckPattern(deck: deck, pattern: p)]
         case (.browse, .relative(let n)): return browse(n)
         case (.browsePress, .press(let down)):
             if let t = heldTrackPads.values.first {       // a track held: roll the dice on it
@@ -497,18 +509,24 @@ public final class TrigMapper {
                 return .stepCond(track: track, step: st, cond: c)
             }
         }
-        if page == .src {
-            let k = Machine.allCases.count
-            return [.machine(track: track, machine: ((model.machine(track).rawValue + n) % k + k) % k)]
-        }
         if page == .master, !model.packNames.isEmpty {     // the sound packs: turn to choose, press to load
             let k = model.packNames.count
             packCursor = ((packCursor + n) % k + k) % k
             packBrowsed = now()
             return []
         }
-        return selectTrack(track + n)
+        // (DJ decks) the patterns, as a DJ browses tracks: turn to choose, LOAD A / B to load it onto a deck. A fresh
+        // browse starts from the waiting deck's pattern
+        if now() - patternBrowsed > 6 { patternCursor = model.deckPattern(1 - model.onAir) }
+        patternCursor = ((patternCursor + n) % 16 + 16) % 16
+        patternBrowsed = now()
+        return []
     }
+
+    /// (DJ decks) the pattern BROWSE points at, when it last moved; the last pattern loaded with LOAD (its deck, when)
+    public private(set) var patternCursor = 0
+    public private(set) var patternBrowsed: Double = -100
+    public private(set) var patternLoaded: (index: Int, deck: Int, at: Double)?
 
     /// the pack BROWSE points at on the MASTER page, and when it last moved or loaded (the strip shows the list)
     public private(set) var packCursor = 0
@@ -663,11 +681,13 @@ public final class TrigMapper {
             if !held.isEmpty, let st = heldSteps.first {
                 return ControlFace(title: "COND", value: model.condName(model.step(track: track, step: st).cond))
             }
-            if page == .src { return ControlFace(title: "MACHINE", value: model.machineName(model.machine(track).rawValue), color: trackColor) }
             if page == .master, packCursor < model.packNames.count {
                 return ControlFace(title: "PACK", value: model.packNames[packCursor], color: TrigColors.page[TrigPage.master.rawValue])
             }
-            return ControlFace(title: "TRACK", value: "\(track + 1)", color: trackColor)
+            // (DJ decks) the pattern chosen for LOAD (the waiting deck's, until you turn)
+            let p = now() - patternBrowsed < 60 ? patternCursor : model.deckPattern(1 - model.onAir)
+            let n = model.patternName(p)
+            return ControlFace(title: "PATTERN", value: String(format: "P%02d", p + 1) + (n.isEmpty ? "" : " " + n))
         case .browsePress:
             if heldTrackPads.isEmpty, page == .master, !model.packNames.isEmpty { return ControlFace(title: "LOAD PACK") }
             return ControlFace(title: heldTrackPads.isEmpty ? "AUDITION" : "DICE")
@@ -768,13 +788,13 @@ public final class TrigMapper {
                 return d == .left ? "SLIDE: the held step slides into the next note." : "ACCENT: the held step is accented: louder and brighter."
             }
             let me = d == .left ? "A" : "B"
-            return "LOAD \(me): the next pattern on deck \(me) (SHIFT: the previous); at once if it is stopped, else when its pattern ends."
+            return "LOAD \(me): puts the pattern chosen with BROWSE on deck \(me) (SHIFT: its next pattern); at once if the deck is stopped, else when its pattern ends."
         case .browse, .browsePress:
             if !heldTrackPads.isEmpty { return "Turn: how many hits, spread evenly over the track (Euclidean). Push: roll the dice." }
             if !held.isEmpty { return "Turn: the held step's condition: when it plays (ALWAYS, FILL, a chance, 1:4...)." }
-            if page == .src { return "Turn: the active track's machine (KICK, SNARE, HAT, CLAP, TOM, SYNTH, FM, SAMPLE). Push: hear the track." }
             if page == .master { return "Turn: choose a sound pack (808, 909, KEYS...). Push: load its sounds into this pattern, the steps stay. SHIFT + push: undo." }
-            return "Turn: choose the active track. Push: hear it (AUDITION)."
+            return "Turn: choose a pattern; LOAD A or LOAD B puts it on that deck. Push: hear the active track (AUDITION). "
+                + (page == .src ? "SHIFT + turn: the active track's machine." : "SHIFT + turn: the active track's length, a step at a time.")
         case .headphoneCue(let d):
             let s = d == .left ? "A" : "B"
             return "SCENE \(s): hold and turn knobs to store values in scene \(s); SHIFT + press clears it. The crossfader morphs towards it."

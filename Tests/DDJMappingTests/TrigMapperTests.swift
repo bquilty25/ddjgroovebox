@@ -307,8 +307,18 @@ final class TrigMapperTests: XCTestCase {
     func testPatternsModeQueuesAndCopies() {
         XCTAssertEqual(tap(.pad(.right, 2), mode: .sampler), [.queuePattern(10)])
         XCTAssertEqual(tap(.pad(.left, 7), mode: .sampler, shifted: true), [.copyPattern(from: 0, to: 7)])
-        XCTAssertEqual(send(.load(.right), .press(true)), [.deckPattern(deck: 1, pattern: 5)], "LOAD B: deck B's next pattern")
-        XCTAssertEqual(send(.load(.left), .press(true), shifted: true), [.deckPattern(deck: 0, pattern: 15)], "SHIFT: the previous")
+        XCTAssertEqual(send(.load(.left), .press(true), shifted: true), [.deckPattern(deck: 0, pattern: 1)], "SHIFT + LOAD: the deck's next")
+    }
+
+    func testBrowseChoosesAPatternAndLoadLoadsIt() {
+        XCTAssertEqual(m.face(.browse)?.title, "PATTERN")
+        XCTAssertEqual(m.face(.browse)?.value, "P05", "the waiting deck's pattern to start with")
+        XCTAssertEqual(send(.browse, .relative(2)), [], "turning only chooses")
+        XCTAssertEqual(m.face(.browse)?.value, "P07")
+        XCTAssertEqual(send(.load(.right), .press(true)), [.deckPattern(deck: 1, pattern: 6)], "LOAD B: the chosen pattern on deck B")
+        XCTAssertEqual(m.patternLoaded?.deck, 1)
+        XCTAssertEqual(send(.browse, .relative(-7)), [])
+        XCTAssertEqual(send(.load(.left), .press(true)), [.deckPattern(deck: 0, pattern: 15)], "around the list")
     }
 
     // MARK: pages, scenes, master
@@ -390,6 +400,7 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(send(.callLeft(.right), .press(true), shifted: true), [.length(track: 0, steps: 32)], "to the bar below")
         // SHIFT + BROWSE: one step
         model.lengths[0] = 16
+        send(.loopIn(.left), .press(true))                           // (the TRIG page: on SRC, SHIFT + BROWSE is the machine)
         XCTAssertEqual(send(.browse, .relative(-4), shifted: true), [.length(track: 0, steps: 12)])
         XCTAssertFalse(send(.browse, .relative(1)).contains { if case .length = $0 { return true }; return false },
                        "without SHIFT: BROWSE's page job, not the length")
@@ -459,10 +470,9 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.perfType, PerfFX.sweep.rawValue, "SHIFT: back")
     }
 
-    func testMachineFromBrowseOnSrcPage() {
-        XCTAssertEqual(send(.browse, .relative(1)), [.machine(track: 0, machine: 1)])
-        send(.loopIn(.left), .press(true))                           // TRIG page: BROWSE selects tracks
-        XCTAssertEqual(send(.browse, .relative(2)), [.selectTrack(2)])
+    func testMachineFromShiftBrowseOnSrcPage() {
+        XCTAssertEqual(send(.browse, .relative(1), shifted: true), [.machine(track: 0, machine: 1)])
+        XCTAssertEqual(send(.browse, .relative(1)), [], "without SHIFT: a pattern is chosen")
     }
 
     // MARK: faces and lights
@@ -513,7 +523,7 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(send(.jog(.left), .relative(10)), [.rotate(track: 1, amount: 2)])
         XCTAssertEqual(send(.browsePress, .press(true)), [.dice(track: 1, amount: 25)])
         send(.pad(.left, 1), .press(false), mode: .beatJump)
-        XCTAssertEqual(m.face(.browse)?.title, "MACHINE", "let go: BROWSE is back to its page job")
+        XCTAssertEqual(m.face(.browse)?.title, "PATTERN", "let go: BROWSE chooses patterns again")
     }
 
     func testSlideAndAccentOnHeldSteps() {

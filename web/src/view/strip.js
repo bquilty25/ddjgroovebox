@@ -133,6 +133,7 @@ export class StripView {
         // the pack browser (MASTER page, BROWSE): shown while browsing and a few seconds after
         const pk = input.packs ?? {};
         this.packs = pk.names ?? [];
+        this.packKind = pk.kind ?? "pack";
         this.packCursor = pk.cursor ?? 0;
         this.packLoaded = pk.loaded ?? null;
         this.packReverted = pk.revertedAt ?? null;
@@ -522,11 +523,16 @@ export class StripView {
             for (let k = 0; k < 5; k++) g.fillRect(b.midX - 14 + k * 6, b.maxY - 9, 3, 5);
             if (chosen && loadAge < 0.35) { body(); g.fillStyle = col(S.fg, 0.35 * (1 - loadAge / 0.35)); g.fill(); }
         }
-        let status;
-        if (this.packReverted != null && now - this.packReverted < 2) status = "REVERTED: THE KIT BEFORE";
-        else if (this.packLoaded && this.packLoaded.index === this.packCursor) status = "LOADED · SHIFT + PUSH: REVERT";
-        else status = "PUSH: LOAD (THE BEAT STAYS)";
-        const hint = `PACK ${this.packCursor + 1}/${n} · ` + status;
+        let status, hint;
+        if (this.packKind === "pattern") {                    // (DJ decks) the patterns
+            status = this.packLoaded && this.packLoaded.index === this.packCursor ? "LOADED" : "LOAD A / LOAD B: PUT IT ON A DECK";
+            hint = `PATTERN P${pad2(this.packCursor + 1)} · ` + status;
+        } else {
+            if (this.packReverted != null && now - this.packReverted < 2) status = "REVERTED: THE KIT BEFORE";
+            else if (this.packLoaded && this.packLoaded.index === this.packCursor) status = "LOADED · SHIFT + PUSH: REVERT";
+            else status = "PUSH: LOAD (THE BEAT STAYS)";
+            hint = `PACK ${this.packCursor + 1}/${n} · ` + status;
+        }
         drawTextTop(g, hint, r.midX - textWidth(hint, 10) / 2, r.minY + 4 + chh + 10, 10, S.fg2);
         g.restore();
     }

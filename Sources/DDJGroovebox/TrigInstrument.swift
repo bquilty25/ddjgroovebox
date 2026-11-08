@@ -239,10 +239,23 @@ final class TrigStripView: NSView, TopStrip {
             if animFrame % 2 == 0 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         }
         // the pack browser (MASTER page, BROWSE): shown while browsing and a few seconds after
-        packs = mapper.model.packNames
-        packCursor = mapper.packCursor
-        packLoaded = mapper.packLoaded
-        packReverted = mapper.packReverted
+        // (DJ decks) or the patterns, BROWSE turned on any other page: the same list, the patterns' names, LOAD going in
+        let patternsLatest = mapper.patternBrowsed > mapper.packBrowsed
+        packsArePatterns = patternsLatest
+        if patternsLatest {
+            packs = (0..<16).map { p in
+                let n = engine.patternName(p)
+                return n.isEmpty ? String(format: "P%02d", p + 1) : n
+            }
+            packCursor = mapper.patternCursor
+            packLoaded = mapper.patternLoaded.map { ($0.index, $0.at) }
+            packReverted = nil
+        } else {
+            packs = mapper.model.packNames
+            packCursor = mapper.packCursor
+            packLoaded = mapper.packLoaded
+            packReverted = mapper.packReverted
+        }
         clockOffset = mapper.now() - CACurrentMediaTime()
         // the step page: a change shows the page map for a moment
         let sp = (mapper.stepPage, mapper.pageCount, mapper.track)
@@ -252,7 +265,7 @@ final class TrigStripView: NSView, TopStrip {
         }
         if mapper.lengthChanged != lengthSeen { lengthSeen = mapper.lengthChanged; pageChanged = now }
         if now - pageChanged < Self.pageMapShown + 0.4 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
-        let browsing = mapper.packBrowsed
+        let browsing = max(mapper.packBrowsed, mapper.patternBrowsed)
         if browsing != packBrowsed { packBrowsed = browsing; setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         if mapper.now() - packBrowsed < Self.scopeShown + 0.5 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         // only what changed: a track's row, or the middle
@@ -346,6 +359,7 @@ final class TrigStripView: NSView, TopStrip {
     private var lastHit: [Double] = Array(repeating: -100, count: 8)
     static let scopeShown = 4.0                                  // seconds the page's picture stays after an edit
     private var packs: [String] = []
+    private var packsArePatterns = false                             // (DJ decks: the list shows the patterns)
     private var packCursor = 0
     private var packBrowsed: Double = -100
     private var packLoaded: (index: Int, at: Double)?
@@ -436,12 +450,17 @@ final class TrigStripView: NSView, TopStrip {
             }
         }
         // what BROWSE and its press do here
-        let status: String
-        if let rv = packReverted, now - rv < 2 { status = "REVERTED: THE KIT BEFORE" }
-        else if let l = packLoaded, l.index == packCursor { status = "LOADED · SHIFT + PUSH: REVERT" }
-        else { status = "PUSH: LOAD (THE BEAT STAYS)" }
-        let hint = NSAttributedString(string: "PACK \(packCursor + 1)/\(n) · " + status,
-                                      attributes: [.font: SloopStyle.font(10), .foregroundColor: SloopStyle.fg2])
+        var status: String, line: String
+        if packsArePatterns {                                         // (DJ decks) the patterns
+            status = packLoaded.map { $0.index == packCursor } == true ? "LOADED" : "LOAD A / LOAD B: PUT IT ON A DECK"
+            line = String(format: "PATTERN P%02d · ", packCursor + 1) + status
+        } else {
+            if let rv = packReverted, now - rv < 2 { status = "REVERTED: THE KIT BEFORE" }
+            else if let l = packLoaded, l.index == packCursor { status = "LOADED · SHIFT + PUSH: REVERT" }
+            else { status = "PUSH: LOAD (THE BEAT STAYS)" }
+            line = "PACK \(packCursor + 1)/\(n) · " + status
+        }
+        let hint = NSAttributedString(string: line, attributes: [.font: SloopStyle.font(10), .foregroundColor: SloopStyle.fg2])
         hint.draw(at: CGPoint(x: r.midX - hint.size().width / 2, y: r.minY + 4 + chh + 10))
     }
 

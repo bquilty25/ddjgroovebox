@@ -325,8 +325,7 @@ test("patterns mode queues and copies", () => {
     const { send, tap } = setUp();
     assert.deepStrictEqual(tap(C.pad(1, 2), { mode: "sampler" }), [{ type: "queuePattern", pattern: 10 }]);
     assert.deepStrictEqual(tap(C.pad(0, 7), { mode: "sampler", shifted: true }), [{ type: "copyPattern", from: 0, to: 7 }]);
-    assert.deepStrictEqual(send(C.load(1), press(true)), [{ type: "deckPattern", deck: 1, pattern: 5 }], "LOAD B: deck B's next");
-    assert.deepStrictEqual(send(C.load(0), press(true), { shifted: true }), [{ type: "deckPattern", deck: 0, pattern: 15 }]);
+    assert.deepStrictEqual(send(C.load(0), press(true), { shifted: true }), [{ type: "deckPattern", deck: 0, pattern: 1 }], "SHIFT + LOAD: the deck's next");
 });
 
 // MARK: pages, scenes, master
@@ -420,6 +419,7 @@ test("track length by steps", () => {
     assert.deepStrictEqual(send(C.callLeft(1), press(true), shifted), len(32), "to the bar below");
     // SHIFT + BROWSE: one step
     model.lengths[0] = 16;
+    send(C.loopIn(0), press(true));                                   // (the TRIG page: on SRC, SHIFT + BROWSE is the machine)
     assert.deepStrictEqual(send(C.browse, relative(-4), shifted), len(12));
     assert.ok(!send(C.browse, relative(1)).some((a) => a.type === "length"),
               "without SHIFT: BROWSE's page job, not the length");
@@ -499,11 +499,17 @@ test("perf FX menu: FILTER first, no TAPE STOP, SHIFT goes back", () => {
     assert.equal(m.perfType, PERF_FX.indexOf("SWEEP"), "SHIFT: back");
 });
 
-test("machine from BROWSE on the SRC page", () => {
-    const { send } = setUp();
-    assert.deepStrictEqual(send(C.browse, relative(1)), [{ type: "machine", track: 0, machine: 1 }]);
-    send(C.loopIn(0), press(true));                                   // TRIG page: BROWSE selects tracks
-    assert.deepStrictEqual(send(C.browse, relative(2)), [{ type: "selectTrack", track: 2 }]);
+test("machine from SHIFT + BROWSE on the SRC page; BROWSE chooses a pattern, LOAD loads it", () => {
+    const { m, send } = setUp();
+    assert.deepStrictEqual(send(C.browse, relative(1), { shifted: true }), [{ type: "machine", track: 0, machine: 1 }]);
+    assert.equal(m.face(C.browse).title, "PATTERN");
+    assert.equal(m.face(C.browse).value, "P05", "the waiting deck's pattern to start with");
+    assert.deepStrictEqual(send(C.browse, relative(2)), [], "turning only chooses");
+    assert.equal(m.face(C.browse).value, "P07");
+    assert.deepStrictEqual(send(C.load(1), press(true)), [{ type: "deckPattern", deck: 1, pattern: 6 }], "LOAD B: the chosen one");
+    assert.equal(m.patternLoaded.deck, 1);
+    send(C.browse, relative(-7));
+    assert.deepStrictEqual(send(C.load(0), press(true)), [{ type: "deckPattern", deck: 0, pattern: 15 }], "around the list");
 });
 
 // MARK: faces and lights
@@ -558,7 +564,7 @@ test("a held track pad rotates and makes Euclid", () => {
     assert.deepStrictEqual(send(C.jog(0), relative(10)), [{ type: "rotate", track: 1, amount: 2 }]);
     assert.deepStrictEqual(send(C.browsePress, press(true)), [{ type: "dice", track: 1, amount: 25 }]);
     send(C.pad(0, 1), press(false), { mode: "beatJump" });
-    assert.equal(m.face(C.browse).title, "MACHINE", "let go: BROWSE is back to its page job");
+    assert.equal(m.face(C.browse).title, "PATTERN", "let go: BROWSE chooses patterns again");
 });
 
 test("slide and accent on held steps", () => {

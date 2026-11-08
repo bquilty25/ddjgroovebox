@@ -23,7 +23,8 @@ header saying its pattern, whether it plays, which deck is **on air** (heard, it
 (outlined). Both decks run on one clock, so they stay in time.
 
 1. **PLAY** on a deck starts or stops that deck. With one deck playing, it works like a groovebox: edit as you like.
-2. **LOAD A / LOAD B** choose each deck's pattern (SHIFT: the previous one). Load the next pattern on the waiting deck.
+2. Turn **BROWSE** to choose a pattern (the list slides across the middle of the screen), then press **LOAD A** or
+   **LOAD B** to put it on that deck. Load the next pattern on the waiting deck. (SHIFT + LOAD: the deck's next one.)
 3. Press **PLAY on the waiting deck** (it says BLEND): it starts on the next bar, silent, and a blend begins. The
    crossfader becomes the **Smart Fader** and the mixer's knobs become each deck's DJ EQ (HI, MID, LOW) and filter.
 4. Move the **crossfader** towards the new deck. One movement does the mix: the new deck comes in, the basses swap at
@@ -101,8 +102,8 @@ kit the load replaced (again: back to the pack).
 | Right BEAT SYNC | EDIT A / EDIT B: the deck the pads, knobs and jogs edit. SHIFT: the MASTER page (delay, reverb, compressor...); again: back |
 | CUE/LOOP CALL ◀ ▶ | left deck: previous / next track; right deck: step page (17-32...). **Track length:** SHIFT + right ◀ ▶ makes the active track a bar shorter / longer (16, 32, 48, 64 steps; a new bar starts as a copy of the one before); SHIFT + turn BROWSE changes it a step at a time (1 to 64, for polymetric loops like 12 or 7) |
 | A track's row in the strip on top | click it: that track becomes the active one (on the other side: that deck is edited) |
-| LOAD A / LOAD B | that deck's next pattern (SHIFT: the previous); at once if the deck is stopped, else when its pattern ends |
-| BROWSE | the machine (SRC page) or the track; press: audition the track |
+| LOAD A / LOAD B | put the pattern chosen with BROWSE on that deck (SHIFT: the deck's next pattern); at once if the deck is stopped, else when its pattern ends |
+| BROWSE | turn: choose a pattern for LOAD (on the MASTER page: a sound pack); press: audition the track. SHIFT + turn: the active track's machine (SRC page) or its length a step at a time (other pages) |
 | PLAY | starts / stops its own deck; on the waiting deck while the other plays: BLEND (it starts on the next bar and the Smart Fader takes over); SHIFT: back to the start |
 | CUE | left: record live (pads in KEYS mode are recorded); right: tap tempo (SHIFT + TAP: back to the tempo from before the taps) |
 | Left BEAT SYNC | FILL while held; SHIFT: AUTOPILOT |

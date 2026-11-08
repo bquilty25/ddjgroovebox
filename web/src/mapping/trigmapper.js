@@ -107,6 +107,10 @@ export class TrigMapper {
         /** the pack last loaded (its name slides in on the strip), and when: { index, at } or null */
         this.packLoaded = null;
         this.packReverted = null;
+        /** (DJ decks) the pattern BROWSE points at, when it last moved; the last LOAD: { index, deck, at } or null */
+        this.patternCursor = 0;
+        this.patternBrowsed = -100;
+        this.patternLoaded = null;
         /** ticks of a jog's side per track: a quarter turn of the platter (720 ticks a turn), so the marker on the drawn
          *  jog turns with the real one and the quadrant it points into is always the active track */
         this.jogTicksPerTrack = 180;
@@ -200,6 +204,9 @@ export class TrigMapper {
             return [];
         }
         if (kind === "browse" && "relative" in v && e.shifted && this.#held.size === 0 && this.#heldTrackPads.size === 0) {
+            if (this.page === PAGE.src) {                    // SHIFT on the SRC page: the active track's machine
+                return [{ type: "machine", track: this.track, machine: mod(model.machine(this.track) + v.relative, MACHINE_COUNT) }];
+            }
             return this.#setLength(Math.min(64, Math.max(1, model.length(this.track) + v.relative)));   // SHIFT: a step
         }
         if (kind === "load" && pressed) {
@@ -212,9 +219,13 @@ export class TrigMapper {
                                    : { type: "stepAccent", track: this.track, step: st, on: !first.accent };
                 });
             }
-            // (DJ decks) LOAD: the deck's next pattern (SHIFT: the previous), at once if it is stopped, else at its end
-            const base = model.deckQueued(d) ?? model.deckPattern(d);
-            return [{ type: "deckPattern", deck: d, pattern: (base + (e.shifted ? 15 : 1)) % 16 }];
+            // (DJ decks) LOAD: the pattern chosen with BROWSE onto the deck (SHIFT: the deck's next pattern); at once if
+            // the deck is stopped, else at the end of its pattern
+            if (e.shifted) return [{ type: "deckPattern", deck: d, pattern: ((model.deckQueued(d) ?? model.deckPattern(d)) + 1) % 16 }];
+            const p = this.chosenPattern;
+            this.patternLoaded = { index: p, deck: d, at: this.now() };
+            this.patternBrowsed = this.now();                // (the list shows it going in)
+            return [{ type: "deckPattern", deck: d, pattern: p }];
         }
         if (kind === "browse" && "relative" in v) return this.#browse(v.relative);
         if (kind === "browsePress" && isPress) {
@@ -617,16 +628,22 @@ export class TrigMapper {
                 return { type: "stepCond", track, step: st, cond: mod(model.step(track, st).cond + n, k) };
             });
         }
-        if (this.page === PAGE.src) {
-            return [{ type: "machine", track, machine: mod(model.machine(track) + n, MACHINE_COUNT) }];
-        }
         const packs = this.#packNames();
         if (this.page === PAGE.master && packs.length > 0) {   // the sound packs: turn to choose, press to load
             this.packCursor = mod(this.packCursor + n, packs.length);
             this.packBrowsed = this.now();
             return [];
         }
-        return this.#selectTrack(track + n);
+        // (DJ decks) the patterns, as a DJ browses tracks: turn to choose, LOAD A / B to load it onto a deck. A fresh
+        // browse starts from the waiting deck's pattern
+        if (this.now() - this.patternBrowsed > 6) this.patternCursor = model.deckPattern(1 - model.onAir);
+        this.patternCursor = mod(this.patternCursor + n, 16);
+        this.patternBrowsed = this.now();
+        return [];
+    }
+    /** the pattern LOAD would load: the one BROWSE chose (the waiting deck's, until you turn) */
+    get chosenPattern() {
+        return this.now() - this.patternBrowsed < 60 ? this.patternCursor : this.model.deckPattern(1 - this.model.onAir);
     }
 
     /** Where a deck's track-ring marker points, in quadrants: 0 is the centre of the deck's first track, 1 the
@@ -793,14 +810,14 @@ export class TrigMapper {
             }
             const steps = this.heldSteps;
             if (steps.length > 0) return face("COND", { value: model.condName(model.step(this.track, steps[0]).cond) });
-            if (this.page === PAGE.src) {
-                return face("MACHINE", { value: model.machineName(model.machine(this.track)), color: trackColor });
-            }
             const packs = this.#packNames();
             if (this.page === PAGE.master && this.packCursor < packs.length) {
                 return face("PACK", { value: packs[this.packCursor], color: COLORS.page[PAGE.master] });
             }
-            return face("TRACK", { value: String(this.track + 1), color: trackColor });
+            {   // (DJ decks) the pattern chosen for LOAD (the waiting deck's, until you turn)
+                const p = this.chosenPattern, nm = model.patternName?.(p) ?? "";
+                return face("PATTERN", { value: `P${String(p + 1).padStart(2, "0")}` + (nm ? " " + nm : "") });
+            }
         }
         case "browsePress":
             if (this.#heldTrackPads.size === 0 && this.page === PAGE.master && this.#packNames().length > 0) {
@@ -908,14 +925,14 @@ export class TrigMapper {
             if (held) return d === 0 ? "SLIDE: the held step slides into the next note." : "ACCENT: the held step is accented: louder and brighter.";
         {
             const me = d === 0 ? "A" : "B";
-            return `LOAD ${me}: the next pattern on deck ${me} (SHIFT: the previous); at once if it is stopped, else when its pattern ends.`;
+            return `LOAD ${me}: puts the pattern chosen with BROWSE on deck ${me} (SHIFT: its next pattern); at once if the deck is stopped, else when its pattern ends.`;
         }
         case "browse": case "browsePress":
             if (this.#heldTrackPads.size > 0) return "Turn: how many hits, spread evenly over the track (Euclidean). Push: roll the dice.";
             if (held) return "Turn: the held step's condition: when it plays (ALWAYS, FILL, a chance, 1:4...).";
-            if (this.page === PAGE.src) return "Turn: the active track's machine (KICK, SNARE, HAT, CLAP, TOM, SYNTH, FM, SAMPLE). Push: hear the track.";
             if (this.page === PAGE.master) return "Turn: choose a sound pack (808, 909, KEYS...). Push: load its sounds into this pattern, the steps stay. SHIFT + push: undo.";
-            return "Turn: choose the active track. Push: hear it (AUDITION).";
+            return "Turn: choose a pattern; LOAD A or LOAD B puts it on that deck. Push: hear the active track (AUDITION). "
+                + (this.page === PAGE.src ? "SHIFT + turn: the active track's machine." : "SHIFT + turn: the active track's length, a step at a time.");
         case "headphoneCue": {
             const s = d === 0 ? "A" : "B";
             return `SCENE ${s}: hold and turn knobs to store values in scene ${s}; SHIFT + press clears it. The crossfader morphs towards it.`;

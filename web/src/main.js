@@ -134,8 +134,13 @@ function update() {
         // (the picture shows when what the knobs show changes: not a lock playing or an LFO moving)
         scopeKey: `${h.page}:${mapper.track}:${engine.machine(mapper.track)}:` +
                   Array.from({ length: 8 }, (_, s) => mapper.knobFace(s).value).join("|"),
-        packs: { names: engine.packNames, cursor: mapper.packCursor, browsedAt: mapper.packBrowsed,
-                 loaded: mapper.packLoaded, revertedAt: mapper.packReverted },
+        // the pack list (MASTER page) or, BROWSE turned on any other page, the patterns' (DJ decks)
+        packs: mapper.patternBrowsed > mapper.packBrowsed
+            ? { kind: "pattern", names: Array.from({ length: 16 }, (_, p) => engine.patternName(p) || `P${String(p + 1).padStart(2, "0")}`),
+                cursor: mapper.patternCursor, browsedAt: mapper.patternBrowsed,
+                loaded: mapper.patternLoaded ? { index: mapper.patternLoaded.index, at: mapper.patternLoaded.at } : null, revertedAt: null }
+            : { names: engine.packNames, cursor: mapper.packCursor, browsedAt: mapper.packBrowsed,
+                loaded: mapper.packLoaded, revertedAt: mapper.packReverted },
         lengthChangedAt: mapper.lengthChanged,
         clock: mapper.now(),
     });

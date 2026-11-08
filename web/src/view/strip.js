@@ -198,12 +198,16 @@ export class StripView {
         const cy = rect.minY + rect.h * 0.25, ch = rect.h * 0.5;
         r.steps.forEach((s, i) => {
             const cr = new Rect(x(i) + pad, cy, cell - 2 * pad, ch);
+            // s: 1 a trig, 2 locks, 4 a condition (it plays only some times: drawn half full)
             let fill;
-            if (s === 1 || s === 3) fill = r.muted ? col(c, 0.3) : col(c);
-            else if (s === 2) fill = col(c, 0.25);
+            if (s & 1) fill = r.muted ? col(c, 0.3) : col(c);
+            else if (s & 2) fill = col(c, 0.25);
             else fill = col(i % 4 === 0 ? S.s3 : S.s2);
-            fillRect(g, cr, fill);
-            if (s >= 2 && cell > 6) fillRect(g, new Rect(cr.midX - 1.5, cr.maxY - 5, 3, 3), S.fg);
+            if (s & 4) {
+                fillRect(g, cr, col(c, 0.25));
+                fillRect(g, new Rect(cr.minX, cr.midY, cr.w, cr.h / 2), fill);
+            } else fillRect(g, cr, fill);
+            if ((s & 2) && cell > 6) fillRect(g, new Rect(cr.midX - 1.5, cr.maxY - 5, 3, 3), S.fg);
             if (r.playhead === i) {
                 g.strokeStyle = col(S.fg); g.lineWidth = 2;
                 g.strokeRect(cr.x - 1, cr.y - 1, cr.w + 2, cr.h + 2);
@@ -262,23 +266,29 @@ export class StripView {
             lines.forEach((l, i) => drawTextTop(g, l, r.minX, r.minY + 30 + i * 16, 12, S.fg2));
             return;
         }
-        const top = r.minY + 22, rowH = 16, perCol = Math.max(1, Math.floor((r.maxY - top) / rowH));
-        const cols = rows.length > perCol ? 2 : 1, colW = (r.w - (cols - 1) * 16) / cols;   // (two columns when many)
-        const n = rows.length > perCol * cols ? perCol * cols - 1 : rows.length;   // (the last slot: "+N MORE")
+        // every row shown: up to three columns, the rows closer together when even that is not enough
+        const top = r.minY + 22, h = r.maxY - top;
+        let rowH = 16, perCol = Math.max(1, Math.floor(h / rowH));
+        const cols = Math.min(3, Math.ceil(rows.length / perCol));
+        if (rows.length > perCol * cols) { perCol = Math.ceil(rows.length / cols); rowH = Math.max(9, h / perCol); }
+        perCol = Math.max(1, Math.min(perCol, Math.floor(h / rowH)));
+        const colW = (r.w - (cols - 1) * 16) / cols;
+        const n = rows.length > perCol * cols ? perCol * cols - 1 : rows.length;   // (only if it still does not fit)
         const labelW = Math.min(130, colW * 0.42);
         for (let i = 0; i < n; i++) {
             const row = rows[i], y = top + (i % perCol) * rowH;
             const x0 = r.minX + Math.floor(i / perCol) * (colW + 16), bx = x0 + labelW, bw = colW - labelW - 6;
             const px = (v) => bx + (row.max > row.min ? (v - row.min) / (row.max - row.min) : 0.5) * bw;
-            drawTextTop(g, row.label, x0, y, 11, row.color);
-            fillRect(g, new Rect(bx, y + 6, bw, 1), S.s3);
-            if (row.a != null) fillRect(g, new Rect(px(row.a) - 2, y + 2, 4, 9), COLORS.sceneA);
-            if (row.b != null) fillRect(g, new Rect(px(row.b) - 2, y + 2, 4, 9), COLORS.sceneB);
-            fillRect(g, new Rect(px(row.base) - 0.5, y + 1, 1, 11), S.fg2);
+            const k = rowH / 16;                       // (the marks shrink with the rows)
+            drawTextTop(g, row.label, x0, y, Math.min(11, rowH - 2), row.color);
+            fillRect(g, new Rect(bx, y + 6 * k, bw, 1), S.s3);
+            if (row.a != null) fillRect(g, new Rect(px(row.a) - 2, y + 2 * k, 4, 9 * k), COLORS.sceneA);
+            if (row.b != null) fillRect(g, new Rect(px(row.b) - 2, y + 2 * k, 4, 9 * k), COLORS.sceneB);
+            fillRect(g, new Rect(px(row.base) - 0.5, y + k, 1, 11 * k), S.fg2);
             let v = row.base;
             if (amtA > 0 && row.a != null) v += (row.a - row.base) * amtA;
             if (amtB > 0 && row.b != null) v += (row.b - row.base) * amtB;
-            fillRect(g, new Rect(px(v) - 1.5, y, 3, 13), S.fg);
+            fillRect(g, new Rect(px(v) - 1.5, y, 3, 13 * k), S.fg);
         }
         if (rows.length > n) {
             drawTextTop(g, `+${rows.length - n} MORE`, r.minX + Math.floor(n / perCol) * (colW + 16), top + (n % perCol) * rowH, 11, S.fg2);
@@ -401,7 +411,7 @@ export class StripView {
                 const s = p * 16 + i;
                 if (s >= n) break;
                 const v = row.steps[s];
-                fillRect(g, new Rect(b.minX + i * cw + 1, b.midY - 4, cw - 2, 8), v === 1 || v === 3 ? col(c, on ? 1 : 0.5) : col(S.s3));
+                fillRect(g, new Rect(b.minX + i * cw + 1, b.midY - 4, cw - 2, 8), (v & 1) ? col(c, on ? 1 : 0.5) : col(S.s3));
                 if (row.playhead === s) fillRect(g, new Rect(b.minX + i * cw + cw * 0.3, b.minY + 3, cw * 0.4, b.h - 6), S.fg);
             }
             g.strokeStyle = col(on ? S.fg : S.s3); g.lineWidth = on ? 2 : 1;

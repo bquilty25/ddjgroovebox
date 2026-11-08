@@ -768,6 +768,9 @@ export class TrigMapper {
         } else if (steps.length > 0) {
             const l = model.lock(track, steps[0], p);
             if (l !== null && l !== undefined) { v = l; badge = "LOCK"; } else v = model.value(track, p);
+        } else {                                      // a parameter the scenes move (the crossfader turns this knob)
+            const a = model.scene(0, track, p) != null, b = model.scene(1, track, p) != null;
+            badge = a && b ? "A·B" : a ? "A" : b ? "B" : null;
         }
         // the full name: the mixer has room for it (CUTOFF, not CUT)
         return face(info.name, { value: model.format(info, v), arc: arcOf(info, v), color, badge });

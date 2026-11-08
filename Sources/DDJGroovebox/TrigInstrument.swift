@@ -160,7 +160,8 @@ final class TrigStripView: NSView, TopStrip {
             let len = max(1, engine.length(t))
             let steps: [UInt8] = (0..<len).map { s in
                 let v = engine.step(track: t, step: s)
-                return v.trig ? (v.locks > 0 ? 3 : 1) : (v.locks > 0 ? 2 : 0)
+                // 1: a trig, 2: locks, 4: a condition (it plays only some times: drawn half full)
+                return (v.trig ? 1 : 0) | (v.locks > 0 ? 2 : 0) | (v.trig && v.cond != 0 ? 4 : 0)
             }
             return TrackRow(name: engine.machineName(engine.machine(t).rawValue), color: TrigColors.track[t],
                             active: t == mapper.track, muted: engine.muted(t),
@@ -276,11 +277,19 @@ final class TrigStripView: NSView, TopStrip {
             for (i, l) in lines.enumerated() { _ = text(l, r.minX, r.minY + 30 + CGFloat(i) * 16, size: 12, SloopStyle.fg2) }
             return
         }
-        let top = r.minY + 22, rowH: CGFloat = 16
-        let perCol = max(1, Int((r.maxY - top) / rowH))
-        let cols = sceneRows.count > perCol ? 2 : 1                   // (two columns when many)
+        // every row shown: up to three columns, the rows closer together when even that is not enough
+        let top = r.minY + 22, h = r.maxY - top
+        var rowH: CGFloat = 16
+        var perCol = max(1, Int(h / rowH))
+        let cols = min(3, (sceneRows.count + perCol - 1) / perCol)
+        if sceneRows.count > perCol * cols {
+            perCol = (sceneRows.count + cols - 1) / cols
+            rowH = max(9, h / CGFloat(perCol))
+        }
+        perCol = max(1, min(perCol, Int(h / rowH)))
         let colW = (r.width - CGFloat(cols - 1) * 16) / CGFloat(cols)
-        let n = sceneRows.count > perCol * cols ? perCol * cols - 1 : sceneRows.count   // (the last slot: "+N MORE")
+        let n = sceneRows.count > perCol * cols ? perCol * cols - 1 : sceneRows.count   // (only if it still does not fit)
+        let k = rowH / 16                                             // (the marks shrink with the rows)
         let labelW = min(130, colW * 0.42)
         func fill(_ rect: CGRect, _ c: NSColor) { g.setFillColor(c.cgColor); g.fill(rect) }
         for i in 0..<n {
@@ -289,15 +298,15 @@ final class TrigStripView: NSView, TopStrip {
             func px(_ v: Double) -> CGFloat {
                 bx + CGFloat(row.max > row.min ? (v - Double(row.min)) / Double(row.max - row.min) : 0.5) * bw
             }
-            _ = text(row.label, x0, y, size: 11, color(row.color))
-            fill(CGRect(x: bx, y: y + 6, width: bw, height: 1), SloopStyle.s3)
-            if let a = row.a { fill(CGRect(x: px(Double(a)) - 2, y: y + 2, width: 4, height: 9), color(TrigColors.sceneA)) }
-            if let b = row.b { fill(CGRect(x: px(Double(b)) - 2, y: y + 2, width: 4, height: 9), color(TrigColors.sceneB)) }
-            fill(CGRect(x: px(Double(row.base)) - 0.5, y: y + 1, width: 1, height: 11), SloopStyle.fg2)
+            _ = text(row.label, x0, y, size: min(11, rowH - 2), color(row.color))
+            fill(CGRect(x: bx, y: y + 6 * k, width: bw, height: 1), SloopStyle.s3)
+            if let a = row.a { fill(CGRect(x: px(Double(a)) - 2, y: y + 2 * k, width: 4, height: 9 * k), color(TrigColors.sceneA)) }
+            if let b = row.b { fill(CGRect(x: px(Double(b)) - 2, y: y + 2 * k, width: 4, height: 9 * k), color(TrigColors.sceneB)) }
+            fill(CGRect(x: px(Double(row.base)) - 0.5, y: y + k, width: 1, height: 11 * k), SloopStyle.fg2)
             var v = Double(row.base)
             if amtA > 0, let a = row.a { v += (Double(a) - v) * amtA }
             if amtB > 0, let b = row.b { v += (Double(b) - v) * amtB }
-            fill(CGRect(x: px(v) - 1.5, y: y, width: 3, height: 13), SloopStyle.fg)
+            fill(CGRect(x: px(v) - 1.5, y: y, width: 3, height: 13 * k), SloopStyle.fg)
         }
         if sceneRows.count > n {
             _ = text("+\(sceneRows.count - n) MORE", r.minX + CGFloat(n / perCol) * (colW + 16), top + CGFloat(n % perCol) * rowH,
@@ -339,7 +348,7 @@ final class TrigStripView: NSView, TopStrip {
                 let s = p * 16 + i
                 guard s < row.steps.count else { break }
                 let v = row.steps[s]
-                g.setFillColor((v == 1 || v == 3 ? c.withAlphaComponent(on ? 1 : 0.5) : SloopStyle.s3).cgColor)
+                g.setFillColor((v & 1 != 0 ? c.withAlphaComponent(on ? 1 : 0.5) : SloopStyle.s3).cgColor)
                 g.fill(CGRect(x: box.minX + CGFloat(i) * cw + 1, y: box.midY - 4, width: cw - 2, height: 8))
                 if row.playhead == s { g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: box.minX + CGFloat(i) * cw, y: box.minY + 3, width: cw, height: box.height - 6).insetBy(dx: cw * 0.3, dy: 0)) }
             }
@@ -611,13 +620,13 @@ final class TrigStripView: NSView, TopStrip {
         let cy = rect.minY + rect.height * 0.25, ch = rect.height * 0.5
         for (i, s) in r.steps.enumerated() {
             let cr = CGRect(x: x(i) + pad, y: cy, width: cell - 2 * pad, height: ch)
-            switch s {
-            case 1, 3: g.setFillColor((r.muted ? c.withAlphaComponent(0.3) : c).cgColor)
-            case 2: g.setFillColor(c.withAlphaComponent(0.25).cgColor)
-            default: g.setFillColor((i % 4 == 0 ? SloopStyle.s3 : SloopStyle.s2).cgColor)
-            }
-            g.fill(cr)
-            if s >= 2 && cell > 6 { g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: cr.midX - 1.5, y: cr.maxY - 5, width: 3, height: 3)) }
+            let fill: NSColor = s & 1 != 0 ? (r.muted ? c.withAlphaComponent(0.3) : c)
+                : s & 2 != 0 ? c.withAlphaComponent(0.25) : (i % 4 == 0 ? SloopStyle.s3 : SloopStyle.s2)
+            if s & 4 != 0 {                                       // a condition: half full
+                g.setFillColor(c.withAlphaComponent(0.25).cgColor); g.fill(cr)
+                g.setFillColor(fill.cgColor); g.fill(CGRect(x: cr.minX, y: cr.midY, width: cr.width, height: cr.height / 2))
+            } else { g.setFillColor(fill.cgColor); g.fill(cr) }
+            if s & 2 != 0 && cell > 6 { g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: cr.midX - 1.5, y: cr.maxY - 5, width: 3, height: 3)) }
             if r.playhead == i { g.setStrokeColor(SloopStyle.fg.cgColor); g.setLineWidth(2); g.stroke(cr.insetBy(dx: -1, dy: -1)) }
         }
         if bars > 1 && r.active {                         // the page on the pads (the active track's): a frame

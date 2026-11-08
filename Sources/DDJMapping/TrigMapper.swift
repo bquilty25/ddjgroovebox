@@ -619,6 +619,9 @@ public final class TrigMapper {
             badge = s == 0 ? "A" : "B"
         } else if let st = heldSteps.first {
             if let l = model.lock(track: track, step: st, param: p) { v = l; badge = "LOCK" } else { v = model.value(track: track, param: p) }
+        } else {                                      // a parameter the scenes move (the crossfader turns this knob)
+            let a = model.scene(0, track: track, param: p) != nil, b = model.scene(1, track: track, param: p) != nil
+            badge = a && b ? "A·B" : a ? "A" : b ? "B" : nil
         }
         // the full name: the mixer has room for it (CUTOFF, not CUT)
         return ControlFace(title: info.name, value: model.format(info, v), arc: arc(info, v), color: color, badge: badge)

@@ -95,7 +95,10 @@ function update() {
         header: h,
         rows: Array.from({ length: 8 }, (_, t) => {
             const n = engine.length(t), steps = new Array(n);
-            for (let s = 0; s < n; s++) { const v = engine.step(t, s); steps[s] = v.trig ? (v.locks ? 3 : 1) : (v.locks ? 2 : 0); }
+            for (let s = 0; s < n; s++) {                 // 1: a trig, 2: locks, 4: a condition (not every time)
+                const v = engine.step(t, s);
+                steps[s] = (v.trig ? 1 : 0) | (v.locks ? 2 : 0) | (v.trig && v.cond !== 0 ? 4 : 0);
+            }
             return { name: engine.machineName(engine.machine(t)), color: COLORS.track[t], active: t === mapper.track,
                      muted: engine.muted(t), level: engine.trackLevel(t), steps, playhead: engine.playingStep(t) };
         }),

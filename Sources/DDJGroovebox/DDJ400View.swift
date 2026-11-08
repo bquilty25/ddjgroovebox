@@ -513,8 +513,8 @@ public struct DeckTrackFace: Equatable {
                 add(.padModeButton(deck, m.0), .mode(m.0, m.1), r, m.0.ddjLabel, .inside, .above(width: padW + 4))
             }
             for i in 0..<8 {
-                let col = CGFloat(i % 4), rowY: CGFloat = i < 4 ? 470 : 560
-                add(.pad(deck, i), .pad, CGRect(x: padX0 + col * (padW + gap), y: rowY, width: padW, height: 84), "", .none, .inside)
+                let col = CGFloat(i % 4), rowY: CGFloat = i < 4 ? 476 : 476 + padW + gap   // (square, as on the DDJ)
+                add(.pad(deck, i), .pad, CGRect(x: padX0 + col * (padW + gap), y: rowY, width: padW, height: padW), "", .none, .inside)
             }
         }
 

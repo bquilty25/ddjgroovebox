@@ -101,8 +101,8 @@ function makeLayout(G) {
             add(C.padModeButton(deck, base), "mode", r, PAD_MODE_LABEL[base], "inside", above(padW + 4), null, { base, alt });
         });
         for (let i = 0; i < 8; i++) {
-            const c = i % 4, rowY = i < 4 ? 470 : 560;
-            add(C.pad(deck, i), "pad", new Rect(padX0 + c * (padW + gap), rowY, padW, 84), "", "none", "inside");
+            const c = i % 4, rowY = i < 4 ? 476 : 476 + padW + gap;   // (square, as on the DDJ)
+            add(C.pad(deck, i), "pad", new Rect(padX0 + c * (padW + gap), rowY, padW, padW), "", "none", "inside");
         }
     }
     const mid = G.mixerMid, chL = G.mixerMid - G.channelHalf, chR = G.mixerMid + G.channelHalf;

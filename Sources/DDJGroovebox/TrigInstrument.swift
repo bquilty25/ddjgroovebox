@@ -322,10 +322,10 @@ final class TrigStripView: NSView, TopStrip {
         hint.draw(at: CGPoint(x: r.midX - hint.size().width / 2, y: r.minY + 4 + chh + 10))
     }
 
-    /// the empty middle of the strip, between the page line and the crossfader bar
+    /// the empty middle of the strip, under the page line
     private var stageRect: CGRect {
         let r = centerRect
-        return CGRect(x: r.minX, y: r.minY + 104, width: r.width, height: max(0, r.maxY - 26 - (r.minY + 104)))
+        return CGRect(x: r.minX, y: r.minY + 104, width: r.width, height: max(0, r.maxY - 4 - (r.minY + 104)))
     }
 
     /// The stage: one little figure per track, in its colour and its machine's shape, jumping when it plays, blinking
@@ -557,15 +557,6 @@ final class TrigStripView: NSView, TopStrip {
         else if c.autopilot { _ = text("AUTOPILOT", r.maxX, y, size: 12, SloopStyle.track[2], right: true) }
         if let s = c.scene { _ = text(s == 0 ? "SCENE A EDIT" : "SCENE B EDIT", r.minX + 70, y + 2, size: 12, color(s == 0 ? TrigColors.sceneA : TrigColors.sceneB)) }
         if let p = c.problem { _ = text(p, r.minX, y + 22, size: 12, SloopStyle.red) }   // audio not running: say so
-        // the scene morph: A ◀ crossfader ▶ B
-        let by = r.maxY - 12
-        let bar = CGRect(x: r.minX + 16, y: by, width: r.width - 32, height: 6)
-        g.setFillColor(SloopStyle.s2.cgColor); g.fill(bar)
-        let mid = bar.midX, pos = bar.minX + CGFloat(c.crossfader) * bar.width
-        g.setFillColor(color(c.crossfader < 0.5 ? TrigColors.sceneA : TrigColors.sceneB).cgColor)
-        g.fill(CGRect(x: min(mid, pos), y: bar.minY, width: abs(pos - mid), height: bar.height))
-        g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: pos - 1.5, y: bar.minY - 3, width: 3, height: bar.height + 6))
-        _ = text("A", r.minX, by - 5, size: 12, color(TrigColors.sceneA))
-        _ = text("B", r.maxX, by - 5, size: 12, color(TrigColors.sceneB), right: true)
+        // (the scene morph is the controller's crossfader, drawn at the bottom of the mixer: not repeated here)
     }
 }

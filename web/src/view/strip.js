@@ -143,10 +143,10 @@ export class StripView {
         return new Rect(x0, 8 + (t % 4) * rowH, colW, rowH - 4);
     }
     get centerRect() { return new Rect(this.mixerX + 10, 8, this.rightX - this.mixerX - 20, this.H - 16); }
-    /** the empty middle of the strip, between the page line and the crossfader bar */
+    /** the empty middle of the strip, under the page line */
     get stageRect() {
         const r = this.centerRect;
-        return new Rect(r.minX, r.minY + 104, r.w, Math.max(0, r.maxY - 26 - (r.minY + 104)));
+        return new Rect(r.minX, r.minY + 104, r.w, Math.max(0, r.maxY - 4 - (r.minY + 104)));
     }
 
     // MARK: - Draw
@@ -235,15 +235,7 @@ export class StripView {
             drawTextTop(g, c.scene === 0 ? "SCENE A EDIT" : "SCENE B EDIT", r.minX + 70, y + 2, 12, c.scene === 0 ? COLORS.sceneA : COLORS.sceneB);
         }
         if (c.problem) drawTextTop(g, c.problem, r.minX, y + 22, 12, S.red);
-        // the scene morph: A, the crossfader, B
-        const by = r.maxY - 12;
-        const bar = new Rect(r.minX + 16, by, r.w - 32, 6);
-        fillRect(g, bar, S.s2);
-        const mid = bar.midX, pos = bar.minX + c.crossfader * bar.w;
-        fillRect(g, new Rect(Math.min(mid, pos), bar.minY, Math.abs(pos - mid), bar.h), c.crossfader < 0.5 ? COLORS.sceneA : COLORS.sceneB);
-        fillRect(g, new Rect(pos - 1.5, bar.minY - 3, 3, bar.h + 6), S.fg);
-        drawTextTop(g, "A", r.minX, by - 5, 12, COLORS.sceneA);
-        drawTextTop(g, "B", r.maxX, by - 5, 12, COLORS.sceneB, true);
+        // (the scene morph is the controller's crossfader, drawn at the bottom of the mixer: not repeated here)
     }
 
     // MARK: - The stage

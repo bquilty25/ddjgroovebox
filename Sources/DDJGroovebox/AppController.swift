@@ -84,7 +84,7 @@ final class AppController: NSObject, NSWindowDelegate {
         // scripted runs (snapshots, measurements) never touch a real controller: one in use would get their LEDs,
         // and they would get its presses
         let env = ProcessInfo.processInfo.environment
-        if env["DDJ_SNAPSHOT"] == nil && env["DDJ_DEMO"] == nil {
+        if !Self.scripted {
             midi.start()
             ddjView.connected = midi.connected
             if midi.connected { askPositions() }
@@ -95,6 +95,7 @@ final class AppController: NSObject, NSWindowDelegate {
         RunLoop.main.add(timer!, forMode: .common)       // (also while a control is dragged or a menu is open)
         tick()
         if let path = env["DDJ_SNAPSHOT"] { scheduleScript(snapshot: path) } else if env["DDJ_DEMO"] != nil { scheduleScript(snapshot: nil) }
+        else if env["DDJ_CLICKTEST"] != nil { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.clickTest() } }
     }
 
     /// The instrument's MIDI out every 3 ms, stamped with the time it belongs at (the audio's own clock + the output's
@@ -155,8 +156,14 @@ final class AppController: NSObject, NSWindowDelegate {
         meterTick += 1
         if meterTick % 3 == 0 && !TrigInstrument.diag.contains("nometers") { ddjView.meters = m }   // (20 a second)
         if midi.connected { midi.sendToDDJ(ledWriter.messages(mapper: instrument.leds, meters: m)) }
-        instrument.saveIfNeeded()
+        if !Self.scripted { instrument.saveIfNeeded() }
     }
+
+    /// a scripted run (DDJ_SNAPSHOT, DDJ_DEMO, DDJ_CLICKTEST): no controller, and the user's projects are never written
+    static let scripted: Bool = {
+        let env = ProcessInfo.processInfo.environment
+        return env["DDJ_SNAPSHOT"] != nil || env["DDJ_DEMO"] != nil || env["DDJ_CLICKTEST"] != nil
+    }()
 
     // MARK: the window
 
@@ -197,7 +204,39 @@ final class AppController: NSObject, NSWindowDelegate {
         instrument.releaseAll()
         midi.sendToDDJ(ledWriter.allOff())
         audio.stop()
-        instrument.shutdown()
+        if !Self.scripted { instrument.shutdown() }      // (it saves)
+    }
+
+    /// DDJ_CLICKTEST=1: real mouse events posted to the window (hit testing and all), one control at a time; prints
+    /// what each changed and quits.
+    private func clickTest() {
+        guard let trig = instrument as? TrigInstrument else { print("click test: TRIGDECK only"); exit(1) }
+        func click(_ c: DDJControl) {
+            guard let p = ddjView.center(of: c) else { print("  \(c): not drawn"); return }
+            let w = ddjView.convert(p, to: nil)
+            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                if let e = NSEvent.mouseEvent(with: type, location: w, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                              windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+                    window.sendEvent(e)
+                }
+            }
+            let frameView = window.contentView?.superview
+            let hit = frameView?.hitTest(frameView!.convert(w, from: nil))   // (hitTest takes its superview's coordinates)
+            print("  \(c): hit \(hit.map { String(describing: type(of: $0)) } ?? "nothing")")
+        }
+        func state() -> String {
+            "playing \(trig.engine.playing), track \(trig.mapper.track + 1), step 2 of track \(trig.mapper.track + 1) "
+                + "\(trig.mapper.model.step(track: trig.mapper.track, step: 1).trig ? "on" : "off"), page \(trig.mapper.page)"
+        }
+        print("before: " + state())
+        click(.play(.left)); print("after PLAY: " + state())
+        click(.pad(.left, 1)); print("after pad 2: " + state())
+        click(.reloop(.left)); print("after RELOOP (FLTR page): " + state())
+        click(.padModeButton(.right, .beatJump))
+        click(.pad(.right, 2)); print("after right BEAT JUMP, pad 3 (track 7): " + state())
+        click(.play(.left)); print("after PLAY again: " + state())
+        shutdown()
+        exit(0)
     }
 
     func panic() {

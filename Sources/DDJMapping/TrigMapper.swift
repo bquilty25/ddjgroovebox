@@ -131,8 +131,10 @@ public final class TrigMapper {
             sceneEdit = down ? s : (sceneEdit == s ? nil : sceneEdit)
             return []
         case (.fxSelect, .press(true)):
+            // while one plays: it stops, the next starts (a throw or DUB HOLD left on would never be turned off)
+            let old = perfOn ? perfAction(on: false) : nil
             perfType = (perfType + (e.shifted ? PerfFX.allCases.count - 1 : 1)) % PerfFX.allCases.count
-            return perfOn ? [perfAction(on: true)] : []
+            return perfOn ? [old!, perfAction(on: true)] : []
         case (.beatLeft, .press(true)): perfDivision = max(0, perfDivision - 1); return perfOn ? [perfAction(on: true)] : []
         case (.beatRight, .press(true)): perfDivision = min(Self.divisions.count - 1, perfDivision + 1); return perfOn ? [perfAction(on: true)] : []
         case (.fxOnOff, .press(true)): perfOn.toggle(); return [perfAction(on: perfOn)]   // a toggle: press on, press off

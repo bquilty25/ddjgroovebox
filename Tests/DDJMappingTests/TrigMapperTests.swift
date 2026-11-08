@@ -288,6 +288,10 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(send(.fxLevel, .absolute(0.9)), [.perf(fx: 1, division: 3, target: 0, on: true, amount: 0.9)])
         XCTAssertEqual(send(.fxOnOff, .press(true)), [.perf(fx: 1, division: 3, target: 0, on: false, amount: 0.9)], "pressed again: off")
         XCTAssertEqual(send(.fxOnOff, .press(false)), [])
+        // FX SELECT while one plays: the old one stops before the next starts (no throw left running)
+        send(.fxOnOff, .press(true)); send(.fxOnOff, .press(false))
+        XCTAssertEqual(send(.fxSelect, .press(true)), [.perf(fx: 1, division: 3, target: 0, on: false, amount: 0.9),
+                                                       .perf(fx: 2, division: 3, target: 0, on: true, amount: 0.9)])
     }
 
     func testMachineFromBrowseOnSrcPage() {

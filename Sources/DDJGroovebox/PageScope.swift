@@ -53,6 +53,34 @@ struct PageScope: Equatable {
         case .master: drawMaster(g, plot, c)
         case .trig: drawTrig(g, plot, c)
         }
+        // knobs that cannot be heard as the page is set, and why (top left, over the picture)
+        var y = plot.minY
+        for line in hints {
+            let a = NSAttributedString(string: line, attributes: [.font: SloopStyle.font(11), .foregroundColor: SloopStyle.fg2])
+            a.draw(at: CGPoint(x: plot.minX, y: y))
+            y += 14
+        }
+    }
+
+    /// Why some of the page's knobs do nothing right now (scope.js's scopeHints says the same).
+    var hints: [String] {
+        switch page {
+        case .fltr:
+            let cut = raw[0], type = raw[2], env = raw[3], key = raw[6]
+            let open = (type == 0 && cut >= 124) || (type == 2 && cut <= 3)          // LP all the way up, HP all the way down
+            var out: [String] = []
+            if open && env == 0 { out.append("FILTER WIDE OPEN: TURN CUTOFF TO HEAR RESO") }
+            if open && ((type == 0 && env > 0) || (type == 2 && env < 0)) { out.append("ENV OPENS IT FURTHER: NOTHING TO HEAR") }
+            if env == 0 { out.append("ENV AT 0: ATTACK AND DECAY WAIT FOR ENV") }
+            if key != 0 && !machine.isMelodic { out.append("KEYTRK: DRUMS PLAY ONE NOTE (LOCK NOTES)") }
+            return out
+        case .lfo:
+            if raw[3] == 0 { return ["DEST OFF: THE LFO MOVES NOTHING"] }
+            if raw[4] == 0 { return ["DEPTH AT 0: THE LFO MOVES NOTHING"] }
+            return []
+        default:
+            return []
+        }
     }
 
     // MARK: SRC: the machine's wave

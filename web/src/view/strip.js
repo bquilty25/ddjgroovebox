@@ -229,7 +229,7 @@ export class StripView {
         drawTextTop(g, c.transport, r.maxX, y + 18, 12, c.transport.startsWith("●") ? S.red : S.fg2, true);
         y += 40;
         drawTextTop(g, c.page, r.minX, y, 16, c.pageColor);
-        if (c.perf) drawTextTop(g, c.perf, r.maxX, y, 16, 0xFF2E7CFF, true);
+        if (c.perf) drawTextTop(g, "BEAT FX " + c.perf, r.maxX, y, 16, 0xFF2E7CFF, true);
         else if (c.autopilot) drawTextTop(g, "AUTOPILOT", r.maxX, y, 12, TRACK4[2], true);
         if (c.scene != null) {
             drawTextTop(g, c.scene === 0 ? "SCENE A EDIT" : "SCENE B EDIT", r.minX + 70, y + 2, 12, c.scene === 0 ? COLORS.sceneA : COLORS.sceneB);
@@ -249,7 +249,7 @@ export class StripView {
     // MARK: - The stage
 
     /** One little figure per track, in its colour and its machine's shape, jumping when it plays, blinking when it does
-     *  not; the floor is the 16 steps with the playhead; a beat FX shows its name behind them. */
+     *  not; the floor is the 16 steps with the playhead. */
     _stage(r) {
         const g = this.g;
         if (r.h < 24 || this.rows.length !== 8) return;
@@ -262,11 +262,7 @@ export class StripView {
             const lit = this.stageStep === i;
             fillRect(g, new Rect(r.minX + i * sw + 2, floorY + 1, sw - 4, lit ? 4 : 2), lit ? S.fg : (i % 4 === 0 ? S.s3 : S.s2));
         }
-        if (this.center.perf) {
-            const size = Math.min(r.h * 0.8, 40);
-            const p = this.center.perf;
-            drawTextTop(g, p, r.midX - textWidth(p, size) / 2, r.midY - size / 2 - 4, size, col(0xFF2E7CFF, 0.18));
-        }
+        // (a beat FX's name is on the page line above, not here: it covered the page's picture)
         // a hit lifts a figure at once; it falls back (0.82 a frame at 30 frames a second)
         const fall = Math.pow(0.82, dt * 30);
         for (let i = 0; i < 8; i++) {

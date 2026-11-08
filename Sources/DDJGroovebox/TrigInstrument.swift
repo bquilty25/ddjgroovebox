@@ -329,7 +329,7 @@ final class TrigStripView: NSView, TopStrip {
     }
 
     /// The stage: one little figure per track, in its colour and its machine's shape, jumping when it plays, blinking
-    /// when it does not; the floor is the 16 steps with the playhead; a beat FX shows its name behind them.
+    /// when it does not; the floor is the 16 steps with the playhead.
     private func drawStage(_ g: CGContext, _ r: CGRect) {
         guard r.height >= 24, rows.count == 8 else { return }
         let t = CACurrentMediaTime()
@@ -341,13 +341,7 @@ final class TrigStripView: NSView, TopStrip {
             g.setFillColor((lit ? SloopStyle.fg : (i % 4 == 0 ? SloopStyle.s3 : SloopStyle.s2)).cgColor)
             g.fill(CGRect(x: r.minX + CGFloat(i) * sw + 2, y: floorY + 1, width: sw - 4, height: lit ? 4 : 2))
         }
-        // a beat FX: its name, big and faint, behind
-        if let p = center.perf {
-            let size = min(r.height * 0.8, 40)
-            let a = NSAttributedString(string: p, attributes: [.font: SloopStyle.font(size), .foregroundColor: NSColor(argb: 0xFF2E7CFF).withAlphaComponent(0.18)])
-            let s = a.size()
-            a.draw(at: CGPoint(x: r.midX - s.width / 2, y: r.midY - s.height / 2 - 4))
-        }
+        // (a beat FX's name is on the page line above, not here: it covered the page's picture)
         // a hit lifts a figure at once; it falls back (kept up to date under the page's picture too)
         for i in 0..<8 {
             let lv = min(1, stageLevels[i] * 1.6)
@@ -559,7 +553,7 @@ final class TrigStripView: NSView, TopStrip {
         _ = text(c.transport, r.maxX, y + 18, size: 12, c.transport.hasPrefix("●") ? SloopStyle.red : SloopStyle.fg2, right: true)
         y += 40
         _ = text(c.page, r.minX, y, size: 16, color(c.pageColor))
-        if let p = c.perf { _ = text(p, r.maxX, y, size: 16, NSColor(argb: 0xFF2E7CFF), right: true) }
+        if let p = c.perf { _ = text("BEAT FX " + p, r.maxX, y, size: 16, NSColor(argb: 0xFF2E7CFF), right: true) }
         else if c.autopilot { _ = text("AUTOPILOT", r.maxX, y, size: 12, SloopStyle.track[2], right: true) }
         if let s = c.scene { _ = text(s == 0 ? "SCENE A EDIT" : "SCENE B EDIT", r.minX + 70, y + 2, size: 12, color(s == 0 ? TrigColors.sceneA : TrigColors.sceneB)) }
         if let p = c.problem { _ = text(p, r.minX, y + 22, size: 12, SloopStyle.red) }   // audio not running: say so

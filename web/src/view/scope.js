@@ -8,7 +8,7 @@
 //     raw: 8 ints (the page's values), normalised: 8 numbers 0..1 (by their ranges; 0 without a range),
 //     shown: 8 strings (the values as the knobs show them; "" without a range) }
 
-import { PAGE, MACHINE } from "../vocab.js";
+import { PAGE, MACHINE, isMelodic } from "../vocab.js";
 import { S, col, drawTextTop, textWidth, fillRect, Rect } from "./style.js";
 
 /** whether two scopes draw the same picture */
@@ -64,6 +64,28 @@ export function drawScope(g, sc, r, since = null) {
     case PAGE.master: drawMaster(g, sc, plot, c); break;
     default: drawTrig(g, sc, plot, c); break;
     }
+    // knobs that cannot be heard as the page is set, and why (top left, over the picture)
+    scopeHints(sc).forEach((line, i) => drawTextTop(g, line, plot.minX, plot.minY + i * 14, 11, S.fg2));
+}
+
+/** Why some of the page's knobs do nothing right now (PageScope.hints says the same). */
+export function scopeHints(sc) {
+    const raw = sc.raw;
+    if (sc.page === PAGE.fltr) {
+        const cut = raw[0], type = raw[2], env = raw[3], key = raw[6];
+        const open = (type === 0 && cut >= 124) || (type === 2 && cut <= 3);   // LP all the way up, HP all the way down
+        const out = [];
+        if (open && env === 0) out.push("FILTER WIDE OPEN: TURN CUTOFF TO HEAR RESO");
+        if (open && ((type === 0 && env > 0) || (type === 2 && env < 0))) out.push("ENV OPENS IT FURTHER: NOTHING TO HEAR");
+        if (env === 0) out.push("ENV AT 0: ATTACK AND DECAY WAIT FOR ENV");
+        if (key !== 0 && !isMelodic(sc.machine)) out.push("KEYTRK: DRUMS PLAY ONE NOTE (LOCK NOTES)");
+        return out;
+    }
+    if (sc.page === PAGE.lfo) {
+        if (raw[3] === 0) return ["DEST OFF: THE LFO MOVES NOTHING"];
+        if (raw[4] === 0) return ["DEPTH AT 0: THE LFO MOVES NOTHING"];
+    }
+    return [];
 }
 
 // SRC: the machine's wave

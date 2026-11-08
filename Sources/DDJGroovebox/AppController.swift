@@ -126,21 +126,37 @@ final class AppController: NSObject, NSWindowDelegate {
 
     private var positionsAsked: Double?
     private var answers: Set<UInt16> = []
+    private var unanswered = 0
 
+    /// a fresh check (on connect): asks, and asks again every 2 s until answered
     private func askPositions() {
+        unanswered = 0
+        ask()
+    }
+
+    private func ask() {
         answers = []
         positionsAsked = ProcessInfo.processInfo.systemUptime
         midi.requestControlPositions()
     }
 
     private func noteAnswer(_ m: MIDIMessage) {
-        if positionsAsked != nil { answers.insert(UInt16(m.status) << 8 | UInt16(m.data1)) }
+        guard positionsAsked != nil else { return }
+        answers.insert(UInt16(m.status) << 8 | UInt16(m.data1))
+        if answers.count >= 8 {                          // answered: it hears us
+            positionsAsked = nil
+            unanswered = 0
+            setControllerProblem(nil)
+        }
     }
 
+    /// A first request can go unanswered (just after the port connects, or while the MIDI server starts): only three
+    /// in a row mean the controller is not receiving. While it says so, it keeps asking (a replug also starts over).
     private func checkAnswered() {
-        guard let t = positionsAsked, ProcessInfo.processInfo.systemUptime - t > 2 else { return }
-        positionsAsked = nil
-        setControllerProblem(answers.count < 8 ? "DDJ-400 NOT RECEIVING (NO LEDS): UNPLUG IT AND PLUG IT BACK IN" : nil)
+        guard let t = positionsAsked, midi.connected, ProcessInfo.processInfo.systemUptime - t > 2 else { return }
+        unanswered += 1
+        if unanswered >= 3 { setControllerProblem("DDJ-400 NOT RECEIVING (NO LEDS): UNPLUG IT AND PLUG IT BACK IN") }
+        ask()
     }
 
     private func setControllerProblem(_ p: String?) {

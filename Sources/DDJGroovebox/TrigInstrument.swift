@@ -33,6 +33,11 @@ final class TrigInstrument: Instrument {
     private var tickCount = 0
     private var forceUpdate = true                       // (an event shows at the next tick, not the one after)
 
+    func reset(_ c: DDJControl) {
+        forceUpdate = true
+        engine.apply(mapper.reset(c))
+    }
+
     func handle(_ e: DDJEvent) {
         forceUpdate = true
         let actions = mapper.handle(e)

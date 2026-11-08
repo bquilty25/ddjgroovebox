@@ -95,7 +95,8 @@ kit the load replaced (again: back to the pack).
 ## Without a DDJ-400
 
 Click and drag the drawing (pads and buttons hold while the mouse is down; drag knobs and faders; scroll over a jog or
-BROWSE), or play the Mac keyboard, laid out like the controller:
+BROWSE; double-click a knob for its default value, or a held step's lock or a scene's value back to the track's,
+and the crossfader for the middle), or play the Mac keyboard, laid out like the controller:
 
 | Keys | Controls |
 | --- | --- |

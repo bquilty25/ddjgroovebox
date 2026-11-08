@@ -361,6 +361,26 @@ public final class TrigMapper {
         return [.paramSet(track: track, param: p, value: clamped(model.value(track: track, param: p) + n))]
     }
 
+    /// A double-click on a control on screen: its value back to the default. A page knob: the parameter's default for
+    /// the track's machine (MASTER: the global's); a held step: its lock back to the track's value; a scene being
+    /// edited: the scene's value back to the track's. BEAT FX LEVEL: 60 %.
+    public func reset(_ c: DDJControl) -> [TrigAction] {
+        if c == .fxLevel { perfAmount = 0.6; return perfOn ? [perfAction(on: true)] : [] }
+        guard let slot = Self.slot(of: c) else { return [] }
+        if page == .master {
+            guard let info = model.globalInfo(slot: slot) else { return [] }
+            return [.globalSet(slot: slot, value: info.def)]
+        }
+        let p = param(slot)
+        guard let info = model.info(track: track, param: p) else { return [] }
+        let base = model.value(track: track, param: p)
+        if let s = sceneEdit { return [.sceneSet(scene: s, track: track, param: p, value: base)] }
+        if !held.isEmpty && info.lockable {
+            return heldSteps.map { st in edited.insert(st); return .stepLock(track: track, step: st, param: p, value: base) }
+        }
+        return [.paramSet(track: track, param: p, value: info.def)]
+    }
+
     /// how many trigs a track has now (the start of a Euclidean edit)
     func trigCount(_ t: Int) -> Int { (0..<model.length(t)).filter { model.step(track: t, step: $0).trig }.count }
 

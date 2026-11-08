@@ -151,6 +151,19 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.padFunction(.left), .steps, "each deck keeps its own mode")
     }
 
+    func testResetToDefault() {
+        let p = m.page.rawValue * 8 + 0
+        let def = model.info(track: 0, param: p)!.def
+        XCTAssertEqual(m.reset(.eqHi(.left)), [.paramSet(track: 0, param: p, value: def)])
+        XCTAssertEqual(m.reset(.trim(.left)), [], "not a page knob")
+        send(.fxLevel, .absolute(0.9))
+        XCTAssertEqual(m.reset(.fxLevel), [])
+        XCTAssertEqual(m.perfAmount, 0.6)
+        // a held step: its lock back to the track's value
+        send(.pad(.left, 2), .press(true), mode: .hotCue)
+        XCTAssertEqual(m.reset(.eqHi(.left)), [.stepLock(track: 0, step: 2, param: p, value: model.value(track: 0, param: p))])
+    }
+
     func testMuteHeldIsTemporary() {
         XCTAssertEqual(send(.pad(.right, 5), .press(true), mode: .beatJump), [.mute(track: 5, on: true)])
         clock += 1

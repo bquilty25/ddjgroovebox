@@ -47,6 +47,7 @@ function handle(e) {
     if (actions.some((a) => a.type === "capture")) setTimeout(() => engine.captureTo(mapper.track), 50);
 }
 strip.onSelectTrack = (t) => { if (mapper) { force = true; engine.apply(mapper.select(t)); } };
+ddj.onReset((c) => { if (mapper) { force = true; engine.apply(mapper.reset(c)); } });   // (a double-click on a knob)
 ddj.helpText = (c) => {
     const f = mapper?.face(c);
     return f ? [f.title, f.value].filter(Boolean).join(": ") : null;

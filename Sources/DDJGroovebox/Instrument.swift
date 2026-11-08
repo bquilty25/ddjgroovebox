@@ -23,6 +23,8 @@ protocol Instrument: AnyObject {
     var meters: (Double, Double) { get }
 
     func handle(_ e: DDJEvent)
+    /// a double-click on a knob on screen: its value back to the default
+    func reset(_ c: DDJControl)
     /// ~60 times a second: read the instrument's state, update the drawing (faces, captions, lights...)
     func update(_ ddj: DDJ400View, connected: Bool)
     func help(for c: DDJControl) -> String?
@@ -30,6 +32,10 @@ protocol Instrument: AnyObject {
     func releaseAll()
     func saveIfNeeded()
     func shutdown()
+}
+
+extension Instrument {
+    func reset(_ c: DDJControl) {}
 }
 
 /// Instruments' thread-safe side (audio, MIDI): called from other threads.

@@ -33,6 +33,8 @@ public struct DeckTrackFace: Equatable {
 
     /// Clicks, drags and scrolls on the drawing, as DDJ events.
     public var onEvent: ((DDJEvent) -> Void)?
+    /// a double-click on a knob: the app puts its value back to the default
+    public var onReset: ((DDJControl) -> Void)?
 
     /// The control under the mouse pointer (nil when none), on every change.
     public var onHover: ((DDJControl?) -> Void)?
@@ -694,7 +696,8 @@ public struct DeckTrackFace: Equatable {
     // MARK: - Mouse
 
     public override func mouseDown(with event: NSEvent) {
-        pointerDown(at: convert(event.locationInWindow, from: nil), shiftKey: event.modifierFlags.contains(.shift))
+        pointerDown(at: convert(event.locationInWindow, from: nil), shiftKey: event.modifierFlags.contains(.shift),
+                    clicks: event.clickCount)
     }
 
     public override func mouseDragged(with event: NSEvent) {
@@ -741,11 +744,21 @@ public struct DeckTrackFace: Equatable {
         onHover?(c)
     }
 
-    func pointerDown(at p: NSPoint, shiftKey: Bool = false) {
+    func pointerDown(at p: NSPoint, shiftKey: Bool = false, clicks: Int = 1) {
         if drag != nil { pointerUp() }
         guard let it = item(at: p) else { return }
         let shifted = shiftKey || anyShift
         let c = it.control
+        // a double-click: a knob back to its default (onReset: the app asks the mapper), the crossfader to the middle
+        if clicks >= 2, c == .crossfader {
+            moved(c, to: 0.5)
+            emit(DDJEvent(c, .absolute(0.5)))
+            return
+        }
+        if clicks >= 2, case .knob = it.kind {
+            onReset?(c)
+            return
+        }
         switch it.kind {
         case .shiftButton:
             guard case .shift(let deck) = c else { return }

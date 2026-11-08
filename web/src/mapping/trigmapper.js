@@ -446,6 +446,28 @@ export class TrigMapper {
 
     // MARK: knobs, BROWSE, jogs, sliders
 
+    /** A double-click on a control on screen: its value back to the default (Swift's reset). A page knob: the
+     *  parameter's default for the track's machine (MASTER: the global's); a held step: its lock back to the track's
+     *  value; a scene being edited: the scene's value back to the track's. BEAT FX LEVEL: 60 %. */
+    reset(c) {
+        if (c === C.fxLevel) { this.perfAmount = 0.6; return this.perfOn ? [this.#perfAction(true)] : []; }
+        const slot = TrigMapper.slot(c);
+        if (slot === null || slot === undefined) return [];
+        const model = this.model, track = this.track;
+        if (this.page === PAGE.master) {
+            const info = model.globalInfo(slot);
+            return info ? [{ type: "globalSet", slot, value: info.def }] : [];
+        }
+        const p = this.param(slot), info = model.info(track, p);
+        if (!info) return [];
+        const base = model.value(track, p);
+        if (this.sceneEdit !== null) return [{ type: "sceneSet", scene: this.sceneEdit, track, param: p, value: base }];
+        if (this.#held.size > 0 && info.lockable) {
+            return this.heldSteps.map((st) => { this.#edited.add(st); return { type: "stepLock", track, step: st, param: p, value: base }; });
+        }
+        return [{ type: "paramSet", track, param: p, value: info.def }];
+    }
+
     #knob(c, slot, v) {
         if (!this.#knobLast.has(c)) { this.#knobLast.set(c, v); return []; }
         const last = this.#knobLast.get(c);

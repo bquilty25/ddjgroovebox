@@ -62,6 +62,7 @@ final class AppController: NSObject, NSWindowDelegate {
         audio.start(rate: instrument.sampleRate, render: instrument.render)
 
         ddjView.onEvent = { [weak self] e in self?.handle(e, fromHardware: false) }
+        ddjView.onReset = { [weak self] c in self?.instrument.reset(c) }
         ddjView.helpText = { [weak self] c in self?.instrument.help(for: c) }
         layout.onKeyEvent = { [weak self] e in self?.handle(e, fromHardware: false, fromKeyboard: true) }
         midi.onDDJ = { [weak self] m in

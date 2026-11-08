@@ -174,6 +174,7 @@ export class DDJView {
         this.lastTouched = new Map();
         this.drag = null;
         this._listeners = [];
+        this._resetListeners = [];
         this._hoverListeners = [];
         this._frame = 0;
         this._flashTimer = null;
@@ -186,7 +187,7 @@ export class DDJView {
             if (e.button !== 0) return;
             e.preventDefault();
             canvas.setPointerCapture?.(e.pointerId);
-            this.pointerDown(e.offsetX, e.offsetY, e.shiftKey);
+            this.pointerDown(e.offsetX, e.offsetY, e.shiftKey, e.detail);
         });
         canvas.addEventListener("pointermove", (e) => {
             if (this.drag) this.pointerDragged(e.offsetX, e.offsetY);
@@ -209,6 +210,8 @@ export class DDJView {
 
     /** Clicks, drags and scrolls on the drawing, as vocab events. Returns a function that removes the listener. */
     onEvent(cb) { this._listeners.push(cb); return () => { this._listeners = this._listeners.filter((f) => f !== cb); }; }
+    /** A double-click on a knob: cb(control) (the app puts its value back to the default). */
+    onReset(cb) { this._resetListeners.push(cb); return () => { this._resetListeners = this._resetListeners.filter((f) => f !== cb); }; }
     /** The control under the pointer (null when none), on every change. */
     onHover(cb) { this._hoverListeners.push(cb); return () => { this._hoverListeners = this._hoverListeners.filter((f) => f !== cb); }; }
     _emit(e) { for (const f of this._listeners) f(e); }
@@ -437,13 +440,20 @@ export class DDJView {
         for (const f of this._hoverListeners) f(c);
     }
 
-    pointerDown(px, py, shiftKey = false) {
+    pointerDown(px, py, shiftKey = false, clicks = 1) {
         if (this.drag) this.pointerUp();
         const it = this.itemAt(px, py);
         if (!it) return;
         const shifted = shiftKey || this.anyShift;
         const c = it.control;
         const p = parseControl(c);
+        // a double-click: a knob back to its default (onReset: the app asks the mapper), the crossfader to the middle
+        if (clicks >= 2 && (it.kind === "knob" || c === C.crossfader)) {
+            if (c === C.crossfader) { this._moved(c, 0.5); this._emit(ev(c, absolute(0.5))); }
+            else for (const f of this._resetListeners) f(c);
+            this.requestRedraw();
+            return;
+        }
         switch (it.kind) {
         case "shiftButton":
             if (this.shiftLatched.has(p.deck)) { this.shiftLatched.delete(p.deck); this._emit(ev(c, pressV(false))); }

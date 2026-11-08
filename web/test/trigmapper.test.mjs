@@ -165,6 +165,18 @@ test("tracks mode selects and mutes", () => {
     assert.equal(m.padFunction(0), "steps", "each deck keeps its own mode");
 });
 
+test("a double-click resets a knob to its default", () => {
+    const { m, model, send } = setUp();
+    const p = m.page * 8;
+    assert.deepStrictEqual(m.reset(C.eqHi(0)), [{ type: "paramSet", track: 0, param: p, value: model.info(0, p).def }]);
+    assert.deepStrictEqual(m.reset(C.trim(0)), [], "not a page knob");
+    send(C.fxLevel, absolute(0.9));
+    assert.deepStrictEqual(m.reset(C.fxLevel), []);
+    assert.equal(m.perfAmount, 0.6);
+    send(C.pad(0, 2), press(true), { mode: "hotCue" });                  // a held step: its lock back to the track's value
+    assert.deepStrictEqual(m.reset(C.eqHi(0)), [{ type: "stepLock", track: 0, step: 2, param: p, value: model.value(0, p) }]);
+});
+
 test("a mute pad held is temporary", () => {
     const { model, clock, send } = setUp();
     assert.deepStrictEqual(send(C.pad(1, 5), press(true), { mode: "beatJump" }), [{ type: "mute", track: 5, on: true }]);

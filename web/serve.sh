@@ -11,4 +11,4 @@ if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     exit 1
 fi
 echo "open http://localhost:$PORT/web/ in Chrome or Edge (Ctrl-C here to stop)"
-exec python3 -m http.server "$PORT" --bind 127.0.0.1
+exec python3 web/serve.py "$PORT"                     # (no caching: a rebuild is always picked up)

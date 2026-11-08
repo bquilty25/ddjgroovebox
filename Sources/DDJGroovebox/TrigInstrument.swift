@@ -176,12 +176,153 @@ final class TrigStripView: NSView, TopStrip {
         c.connected = connected
         c.scene = h.sceneEdit
         c.problem = problem
+        // the stage: each track's level (its figure jumps), the playhead, the transport
+        let levels = (0..<8).map { engine.trackLevel($0) }
+        let step = engine.playingStep(0).map { $0 % 16 }
+        animFrame += 1
+        let moving = h.playing || levels.contains { $0 > 0.005 } || h.perf != nil
+        if (moving || animFrame % 3 == 0) && animFrame % 2 == 0 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
+        stageLevels = levels
+        stageStep = h.playing ? step : nil
+        // the page's picture: shown while the page, the track or a value on it changes, and a few seconds after
+        let scope = PageScope.read(model: mapper.model, page: h.page, track: mapper.track)
+        let now = CACurrentMediaTime()
+        if scope != stageScope {
+            if stageScope != nil { lastEdit = now }
+            stageScope = scope
+            setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2))
+        }
+        if now - lastEdit < Self.scopeShown + 0.5 && animFrame % 2 == 0 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         // only what changed: a track's row, or the middle
         if rows.count != new.count { rows = new; center = c; needsDisplay = true; return }
         for t in 0..<8 where rows[t] != new[t] { setNeedsDisplay(rowRect(t).insetBy(dx: -2, dy: -2)) }
         if c != center { setNeedsDisplay(centerRect.insetBy(dx: -2, dy: -2)) }
         rows = new
         center = c
+    }
+    private var animFrame = 0
+    private var stageLevels: [Double] = Array(repeating: 0, count: 8)
+    private var stageStep: Int?
+    private var jump: [Double] = Array(repeating: 0, count: 8)   // each figure's height above the floor, 0...1
+    private var stageScope: PageScope?
+    private var lastEdit = -100.0
+    private var lastHit: [Double] = Array(repeating: -100, count: 8)
+    static let scopeShown = 4.0                                  // seconds the page's picture stays after an edit
+
+    /// the empty middle of the strip, between the page line and the crossfader bar
+    private var stageRect: CGRect {
+        let r = centerRect
+        return CGRect(x: r.minX, y: r.minY + 104, width: r.width, height: max(0, r.maxY - 26 - (r.minY + 104)))
+    }
+
+    /// The stage: one little figure per track, in its colour and its machine's shape, jumping when it plays, blinking
+    /// when it does not; the floor is the 16 steps with the playhead; a beat FX shows its name behind them.
+    private func drawStage(_ g: CGContext, _ r: CGRect) {
+        guard r.height >= 24, rows.count == 8 else { return }
+        let t = CACurrentMediaTime()
+        let floorY = r.maxY - 6
+        // the floor: 16 steps
+        let sw = r.width / 16
+        for i in 0..<16 {
+            let lit = stageStep == i
+            g.setFillColor((lit ? SloopStyle.fg : (i % 4 == 0 ? SloopStyle.s3 : SloopStyle.s2)).cgColor)
+            g.fill(CGRect(x: r.minX + CGFloat(i) * sw + 2, y: floorY + 1, width: sw - 4, height: lit ? 4 : 2))
+        }
+        // a beat FX: its name, big and faint, behind
+        if let p = center.perf {
+            let size = min(r.height * 0.8, 40)
+            let a = NSAttributedString(string: p, attributes: [.font: SloopStyle.font(size), .foregroundColor: NSColor(argb: 0xFF2E7CFF).withAlphaComponent(0.18)])
+            let s = a.size()
+            a.draw(at: CGPoint(x: r.midX - s.width / 2, y: r.midY - s.height / 2 - 4))
+        }
+        // a hit lifts a figure at once; it falls back (kept up to date under the page's picture too)
+        for i in 0..<8 {
+            let lv = min(1, stageLevels[i] * 1.6)
+            if lv > jump[i] + 0.15 { lastHit[i] = t }
+            jump[i] = lv > jump[i] ? lv : jump[i] * 0.82
+        }
+        // the page's picture, while editing; fading back to the figures after
+        let shown = t - lastEdit
+        if let scope = stageScope, shown < Self.scopeShown + 0.4 {
+            let a = CGFloat(min(1, (Self.scopeShown + 0.4 - shown) / 0.4))
+            g.saveGState()
+            g.setAlpha(a)
+            let since = t - lastHit[scope.track]
+            scope.draw(g, CGRect(x: r.minX, y: r.minY, width: r.width, height: floorY - r.minY - 2), since: since < 2 ? since : nil)
+            g.restoreGState()
+            if a >= 1 { return }
+            g.setAlpha(1 - a)
+        }
+        let cell = r.width / 8
+        let base = min(r.height * 0.42, cell * 0.5)
+        for i in 0..<8 {
+            let row = rows[i]
+            let j = row.muted ? 0 : jump[i]
+            let breathe = 1 + 0.04 * sin(t * 2.2 + Double(i))
+            let wobble = center.perf != nil ? CGFloat(sin(t * 11 + Double(i) * 0.8)) * 3 : 0
+            let w = base * CGFloat(1 - 0.12 * j), h = base * CGFloat((1 + 0.25 * j) * breathe)
+            let lift = CGFloat(j) * (r.height - h - 10)
+            let cx = r.minX + (CGFloat(i) + 0.5) * cell + wobble
+            let box = CGRect(x: cx - w / 2, y: floorY - 2 - lift - h, width: w, height: h)
+            let c = NSColor(argb: row.color)
+            g.saveGState()
+            if row.muted {
+                g.setStrokeColor(c.withAlphaComponent(0.45).cgColor)
+                g.setLineWidth(1.5)
+            } else {
+                g.setFillColor(c.cgColor)
+            }
+            let path = Self.figure(row.name, in: box, spin: CGFloat(j))
+            g.addPath(path)
+            if row.muted { g.strokePath() } else { g.fillPath(using: row.name == "SAMPLE" ? .evenOdd : .winding) }   // (a ring)
+            g.restoreGState()
+            // eyes: two dots (a blink now and then; closed when muted)
+            let ey = box.minY + box.height * 0.38, ex = box.width * 0.18, er = max(1.5, base * 0.07)
+            let blink = row.muted || (t + Double(i) * 1.7).truncatingRemainder(dividingBy: 4.3) < 0.13
+            g.setFillColor((row.muted ? c.withAlphaComponent(0.45) : SloopStyle.bg).cgColor)
+            for dx in [-ex, ex] {
+                let e = blink ? CGRect(x: box.midX + dx - er, y: ey - 0.75, width: 2 * er, height: 1.5)
+                              : CGRect(x: box.midX + dx - er, y: ey - er, width: 2 * er, height: 2 * er)
+                if blink { g.fill(e) } else { g.fillEllipse(in: e) }
+            }
+            // the active track: a marker above its figure
+            if row.active {
+                g.setFillColor(c.cgColor)
+                let my = max(r.minY + 2, box.minY - 10)
+                g.move(to: CGPoint(x: cx - 5, y: my)); g.addLine(to: CGPoint(x: cx + 5, y: my)); g.addLine(to: CGPoint(x: cx, y: my + 6))
+                g.closePath(); g.fillPath()
+            }
+        }
+    }
+
+    /// a track's figure, by its machine: KICK a circle, SNARE / CLAP a square (it turns as it jumps), HAT a triangle,
+    /// TOM a diamond, SYNTH a rounded bar, FM a plus, SAMPLE a ring
+    private static func figure(_ machine: String, in b: CGRect, spin: CGFloat) -> CGPath {
+        let p = CGMutablePath()
+        switch machine {
+        case "KICK":
+            p.addEllipse(in: b)
+        case "SNARE", "CLAP":
+            let tr = CGAffineTransform(translationX: b.midX, y: b.midY).rotated(by: spin * .pi / 4)
+            p.addRect(CGRect(x: -b.width / 2, y: -b.height / 2, width: b.width, height: b.height), transform: tr)
+        case "HAT":
+            p.move(to: CGPoint(x: b.midX, y: b.minY)); p.addLine(to: CGPoint(x: b.maxX, y: b.maxY)); p.addLine(to: CGPoint(x: b.minX, y: b.maxY))
+            p.closeSubpath()
+        case "TOM":
+            p.move(to: CGPoint(x: b.midX, y: b.minY)); p.addLine(to: CGPoint(x: b.maxX, y: b.midY))
+            p.addLine(to: CGPoint(x: b.midX, y: b.maxY)); p.addLine(to: CGPoint(x: b.minX, y: b.midY))
+            p.closeSubpath()
+        case "FM":
+            let a = b.width / 3, c = b.height / 3
+            p.addRect(CGRect(x: b.minX + a, y: b.minY, width: a, height: b.height))
+            p.addRect(CGRect(x: b.minX, y: b.minY + c, width: b.width, height: c))
+        case "SAMPLE":
+            p.addEllipse(in: b)
+            p.addEllipse(in: b.insetBy(dx: b.width * 0.3, dy: b.height * 0.3))
+        default:                                         // SYNTH and anything else
+            p.addRoundedRect(in: b, cornerWidth: min(b.width, b.height) * 0.3, cornerHeight: min(b.width, b.height) * 0.3)
+        }
+        return p
     }
 
     private var mixerX: CGFloat { (bounds.width * DDJ400View.columnFractions.mixerStart).rounded() }
@@ -212,6 +353,7 @@ final class TrigStripView: NSView, TopStrip {
             drawRow(g, rows[t], number: t + 1, rect: rowRect(t))
         }
         if needsToDraw(centerRect) { drawCenter(g, centerRect) }
+        if needsToDraw(stageRect) { drawStage(g, stageRect) }
         _ = (mx, rx, H)
     }
 

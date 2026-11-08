@@ -96,6 +96,7 @@ final class AppController: NSObject, NSWindowDelegate {
         tick()
         if let path = env["DDJ_SNAPSHOT"] { scheduleScript(snapshot: path) } else if env["DDJ_DEMO"] != nil { scheduleScript(snapshot: nil) }
         else if env["DDJ_CLICKTEST"] != nil { DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.clickTest() } }
+        else if let path = env["DDJ_SCOPES"] { scopeSheet(path) }
     }
 
     /// The instrument's MIDI out every 3 ms, stamped with the time it belongs at (the audio's own clock + the output's
@@ -225,6 +226,29 @@ final class AppController: NSObject, NSWindowDelegate {
         midi.sendToDDJ(ledWriter.allOff())
         audio.stop()
         if !Self.scripted { instrument.shutdown() }      // (it saves)
+    }
+
+    /// DDJ_SCOPES=file.png: every page's picture for each of the 8 tracks (the default project), in one sheet
+    private func scopeSheet(_ path: String) {
+        guard let trig = instrument as? TrigInstrument else { exit(1) }
+        let cw = 300, ch = 90, pages = TrigPage.allCases
+        let W = cw * pages.count, H = ch * 8
+        guard let ctx = CGContext(data: nil, width: W, height: H, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { exit(1) }
+        ctx.translateBy(x: 0, y: CGFloat(H)); ctx.scaleBy(x: 1, y: -1)
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: true)
+        ctx.setFillColor(SloopStyle.s1.cgColor); ctx.fill(CGRect(x: 0, y: 0, width: W, height: H))
+        for t in 0..<8 {
+            for (i, p) in pages.enumerated() {
+                let r = CGRect(x: i * cw + 4, y: t * ch + 4, width: cw - 8, height: ch - 8)
+                PageScope.read(model: trig.mapper.model, page: p, track: t).draw(ctx, r, since: nil)
+            }
+        }
+        if let img = ctx.makeImage() {
+            try? NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+        }
+        exit(0)
     }
 
     /// DDJ_CLICKTEST=1: real mouse events posted to the window (hit testing and all), one control at a time; prints

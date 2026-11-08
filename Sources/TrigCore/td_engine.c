@@ -83,7 +83,7 @@ static void ins_update(int n)
         u->target = u->r_target;
         u->div = u->r_div;
         u->amount = u->amount_s = u->r_amount;
-        double len = td_perf_div_steps[clampi(u->div, 0, 5)] * td_frames_per_step();
+        double len = td_perf_div_steps[clampi(u->div, 0, TD_PERF_DIVS - 1)] * td_frames_per_step();
         double cap = (double)(TD_PERF_BUF - XF - 8u);
         if (len > cap) len = cap;
         if (len < 64.0) len = 64.0;
@@ -528,7 +528,8 @@ static void render_segment(float *out, int n)
         float tone = 800.f * exp2f((float)E.gparam[G_DTONE] * (4.3f / 127.f));
         float tm = td_div_steps[clampi(E.gparam[G_DTIME], 0, 11)] * (float)fps;
         td_tape_process(&E.dly, sdl[0], sdl[1], rdl[0], rdl[1], n, tm, dfb, tone, 1);
-        float ttm = td_perf_div_steps[clampi(E.thr_d_div, 0, 5)] * (float)fps;
+        float ttm = td_perf_div_steps[clampi(E.thr_d_div, 0, TD_PERF_DIVS - 1)] * (float)fps;
+        ttm = fminf(ttm, (float)(TD_DLY - 4096u));             /* (the throw's line: 2 and 4 bars at slow tempos) */
         td_tape_process(&E.thr, thr_in[0], thr_in[1], rth[0], rth[1], n, ttm, 0.55f + 0.35f * E.thr_d_amount, 5000.f, 0);
         td_reverb_process(srv[0], srv[1], rrv[0], rrv[1], n, (float)E.gparam[G_RSIZE], (float)E.gparam[G_RDAMP]);
         td_chorus_process(sch[0], sch[1], rch[0], rch[1], n);
@@ -1103,7 +1104,7 @@ void td_perf(int perf, int division, int target, int on, float amount)
 {
     td_lock();
     if (E.inited && perf >= 0 && perf < TD_PERFS) {
-        division = clampi(division, 0, 5);
+        division = clampi(division, 0, TD_PERF_DIVS - 1);
         target = clampi(target, 0, 2);
         amount = amount == amount ? clampf(amount, 0.f, 1.f) : 0.5f;
         td_insert_t *u = &E.ins;

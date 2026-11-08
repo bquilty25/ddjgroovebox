@@ -32,7 +32,8 @@
 #define TD_RING_MASK (TD_RING - 1u)
 #define TD_DLY (1u << 18)                 /* delay lines (master tape delay, throw delay): 5.4 s */
 #define TD_DLY_MASK (TD_DLY - 1u)
-#define TD_PERF_BUF (4u * 48000u + 2048u) /* REPEAT / STUTTER / TAPE STOP capture (4 s stereo) */
+#define TD_PERF_BUF (16u * 48000u + 2048u) /* REPEAT / STUTTER / TAPE STOP .. capture (16 s: 4 bars down to 60 BPM) */
+#define TD_PERF_DIVS 8                    /* beat FX divisions: 1/32 .. 1 bar, 2 bars, 4 bars */
 #define TD_MIDI_Q 2048
 #define TD_EVQ 128
 #define TD_WIDTH_BUF 1024
@@ -78,7 +79,7 @@ int td_gdef(int slot);
 extern const float td_len_steps[17];                           /* LENGTH index -> steps (16 = INF: -1) */
 extern const float td_rrate_steps[4];                          /* retrig rate -> steps between hits */
 extern const float td_div_steps[12];                           /* delay time divisions -> steps */
-extern const float td_perf_div_steps[6];                       /* td_perf divisions -> steps */
+extern const float td_perf_div_steps[TD_PERF_DIVS];            /* td_perf divisions -> steps */
 extern const float td_fm_ratio[16];
 extern const int8_t td_chord_iv[8][4];                         /* chord memory: intervals (-128: no note) */
 extern const uint8_t td_scales[8][12];                         /* scale masks per pitch class */

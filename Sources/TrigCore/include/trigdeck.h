@@ -167,7 +167,7 @@ void td_deck_drive(int deck, float drive);               /* 0 .. 1 (TRIM) */
 void td_scratch(int deck, int touching, float rate);     /* touching: the deck plays its recent audio at `rate` (1 = forward
                                                           * at speed, 0 = held still, -1 = backward); release: back in time */
 /* ---- performance FX */
-void td_perf(int perf, int division, int target, int on, float amount);   /* division 0..5: 1/32, 1/16, 1/8, 1/4, 1/2, 1 bar */
+void td_perf(int perf, int division, int target, int on, float amount);   /* division 0..7: 1/32, 1/16, 1/8, 1/4, 1/2, 1, 2, 4 bars */
 /* (added) resampling: the deck's last `bars` bars (1, 2 or 4; ending at the last bar line) into sample slot `slot`
  * (mono, short fades, named "DECK A 1" ...). 0 ok, -1 if not enough audio recorded or the pool is full. */
 int td_capture(int deck, int bars, int slot);

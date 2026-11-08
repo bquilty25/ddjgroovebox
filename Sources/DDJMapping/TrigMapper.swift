@@ -134,7 +134,7 @@ public final class TrigMapper {
             perfType = (perfType + (e.shifted ? PerfFX.allCases.count - 1 : 1)) % PerfFX.allCases.count
             return perfOn ? [perfAction(on: true)] : []
         case (.beatLeft, .press(true)): perfDivision = max(0, perfDivision - 1); return perfOn ? [perfAction(on: true)] : []
-        case (.beatRight, .press(true)): perfDivision = min(5, perfDivision + 1); return perfOn ? [perfAction(on: true)] : []
+        case (.beatRight, .press(true)): perfDivision = min(Self.divisions.count - 1, perfDivision + 1); return perfOn ? [perfAction(on: true)] : []
         case (.fxOnOff, .press(true)): perfOn.toggle(); return [perfAction(on: perfOn)]   // a toggle: press on, press off
         case (.fxOnOff, .press(false)): return []
         case (.fxChannel(let n), .press(true)): setPerfTarget(n); return perfOn ? [perfAction(on: true)] : []
@@ -439,7 +439,7 @@ public final class TrigMapper {
                    heldSteps: heldSteps)
     }
 
-    static let divisions = ["1/32", "1/16", "1/8", "1/4", "1/2", "1 BAR"]
+    static let divisions = ["1/32", "1/16", "1/8", "1/4", "1/2", "1 BAR", "2 BARS", "4 BARS"]   // (the engine's TD_PERF_DIVS)
 
     public func face(_ c: DDJControl) -> ControlFace? {
         let trackColor = TrigColors.track[track]

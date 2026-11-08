@@ -450,6 +450,24 @@ TEST(test_perf)
         snprintf(msg, sizeof msg, "ECHO .. SWEEP each change the sound%s", bad);
         check(msg, all);
     }
+    /* beyond a bar: a 4-bar REPEAT at 120 BPM loops every 384000 frames (8 s) */
+    {
+        static float r4[2 * 48000 * 26];                       /* (live capture pass + two looped passes: 24.1 s) */
+        sine_source();
+        td_set_tempo(120);
+        for (int s = 0; s < 64; s += 3) td_step_note(0, s, 40 + s % 24, 100);   /* something that changes over 4 bars */
+        td_play(1);
+        for (int i = 0; i < 48000 * 26; i += 32) {
+            if (i == 4800) td_perf(TD_PERF_REPEAT, 7, TD_TARGET_MASTER, 1, 1.f);
+            td_render(r4 + 2 * i, 32, 0);
+        }
+        float err = 0;                                         /* the third pass equals the second */
+        for (int i = 4800 + 384000 + 2000; i < 4800 + 2 * 384000 - 2000; i += 7)
+            err = fmaxf(err, fabsf(r4[2 * (i + 384000)] - r4[2 * i]));
+        char msg[100];
+        snprintf(msg, sizeof msg, "REPEAT 4 bars loops every 384000 frames (error %.5f)", err);
+        check(msg, err < 1e-3f);
+    }
     td_state_t st;
     sine_source();
     td_perf(TD_PERF_REPEAT, 1, TD_TARGET_DECK_A, 1, 1.f);

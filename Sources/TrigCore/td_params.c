@@ -116,7 +116,7 @@ static const char *const RRATE_NAMES[4] = {"1/16", "1/24", "1/32", "1/64"};
 const float td_div_steps[12] = {0.5f, 2.f / 3.f, 1, 1.5f, 2, 8.f / 3.f, 3, 4, 6, 8, 12, 16};
 static const char *const DIV_NAMES[12] = {"1/32", "1/16T", "1/16", "1/16D", "1/8", "1/4T", "3/16", "1/4", "1/4D",
                                           "1/2", "3/4", "1/1"};
-const float td_perf_div_steps[6] = {0.5f, 1, 2, 4, 8, 16};
+const float td_perf_div_steps[TD_PERF_DIVS] = {0.5f, 1, 2, 4, 8, 16, 32, 64};
 const float td_fm_ratio[16] = {0.5f, 1, 1.5f, 2, 2.5f, 3, 3.5f, 4, 4.5f, 5, 6, 7, 8, 9, 11, 14};
 #define NO -128
 const int8_t td_chord_iv[8][4] = {

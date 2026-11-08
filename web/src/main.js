@@ -84,6 +84,9 @@ function update() {
         }),
         crossfader, autopilot: engine.autopilot, connected: !!midiIn, problem,
         scope: readScope(engine, h.page, mapper.track, COLORS.track[mapper.track]),
+        // (the picture shows when what the knobs show changes: not a lock playing or an LFO moving)
+        scopeKey: `${h.page}:${mapper.track}:${engine.machine(mapper.track)}:` +
+                  Array.from({ length: 8 }, (_, s) => mapper.knobFace(s).value).join("|"),
         packs: { names: engine.packNames, cursor: mapper.packCursor, browsedAt: mapper.packBrowsed,
                  loaded: mapper.packLoaded, revertedAt: mapper.packReverted },
         lengthChangedAt: mapper.lengthChanged,

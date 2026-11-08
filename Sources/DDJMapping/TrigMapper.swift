@@ -545,7 +545,8 @@ public final class TrigMapper {
         ControlFace(title: p.name, color: TrigColors.page[p.rawValue], light: page == p ? .on : .off)
     }
 
-    func knobFace(_ slot: Int) -> ControlFace {
+    /// what the mixer knob for the page's slot 0...7 shows (the base value, a held step's lock or a scene's value)
+    public func knobFace(_ slot: Int) -> ControlFace {
         let color = TrigColors.knobRow[slot % 4]
         if page == .master {
             guard let info = model.globalInfo(slot: slot) else { return ControlFace(title: "—", color: color) }

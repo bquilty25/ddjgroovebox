@@ -321,20 +321,29 @@ struct PageScope: Equatable {
     // MARK: TRIG: the note
 
     private func drawTrig(_ g: CGContext, _ r: CGRect, _ c: NSColor) {
-        // a bar: as long as LENGTH, as high as VELOCITY; RETRIG ticks inside it
-        let len = 0.05 + n[2] * 0.9, vel = n[1]
-        let bar = CGRect(x: r.minX, y: r.maxY - CGFloat(vel) * r.height, width: CGFloat(len) * r.width, height: CGFloat(vel) * r.height)
-        g.setFillColor(c.withAlphaComponent(0.35).cgColor); g.fill(bar)
-        g.setFillColor(c.cgColor); g.fill(CGRect(x: bar.minX, y: bar.minY, width: bar.width, height: 3))
-        let rt = raw[3]
-        if rt > 0 {
-            g.setFillColor(SloopStyle.fg.cgColor)
-            for k in 0...rt {
-                let x = bar.minX + bar.width * CGFloat(k) / CGFloat(rt + 1)
-                g.fill(CGRect(x: x, y: bar.minY, width: 2, height: bar.height))
-            }
+        // the note: a bar as long as LENGTH, as high as VELOCITY, moved by MICRO from the step's line; RETRIG splits it
+        // into hits whose heights follow RTRG VEL (RTRG RATE in the caption); COND and the numbers in the caption
+        let top = r.minY + 34                                    // (room for the note's name and the caption)
+        let h = r.maxY - top
+        let start = r.minX + r.width * 0.12, shift = CGFloat(raw[7]) / 23 * r.width * 0.1
+        g.setFillColor(SloopStyle.s3.cgColor); g.fill(CGRect(x: start, y: top, width: 1, height: h))   // the step's line
+        let len = CGFloat(0.05 + n[2] * 0.8) * r.width, vel = CGFloat(n[1])
+        let hits = raw[3] + 1, ramp = CGFloat(raw[5]) / 64
+        for k in 0..<hits {
+            let f = hits > 1 ? CGFloat(k) / CGFloat(hits - 1) : 0
+            let v = max(0.04, min(1, vel * (1 + ramp * f)))
+            let w = len / CGFloat(hits)
+            let b = CGRect(x: start + shift + CGFloat(k) * w, y: r.maxY - v * h, width: max(2, w - (hits > 1 ? 2 : 0)), height: v * h)
+            g.setFillColor(c.withAlphaComponent(0.35).cgColor); g.fill(b)
+            g.setFillColor(c.cgColor); g.fill(CGRect(x: b.minX, y: b.minY, width: b.width, height: 3))
         }
         let note = NSAttributedString(string: shown[0], attributes: [.font: SloopStyle.font(22), .foregroundColor: SloopStyle.fg])
         note.draw(at: CGPoint(x: r.maxX - note.size().width, y: r.minY))
+        var parts = ["VEL " + shown[1], "LEN " + shown[2]]
+        if raw[3] > 0 { parts.append("x\(raw[3] + 1) " + shown[4]) }
+        if raw[6] != 0 { parts.append(shown[6]) }
+        if raw[7] != 0 { parts.append("MICRO " + shown[7]) }
+        let cap = NSAttributedString(string: parts.joined(separator: "  "), attributes: [.font: SloopStyle.font(11), .foregroundColor: SloopStyle.fg2])
+        cap.draw(at: CGPoint(x: r.minX, y: r.minY + 6))
     }
 }

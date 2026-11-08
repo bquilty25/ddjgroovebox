@@ -183,10 +183,14 @@ final class TrigStripView: NSView, TopStrip {
         stageLevels = levels
         stageStep = h.playing ? step : nil
         // the page's picture: shown while the page, the track or a value on it changes, and a few seconds after
+        // (it shows when what the knobs show changes, not when a lock plays or an LFO moves; drawn from live values)
         let scope = PageScope.read(model: mapper.model, page: h.page, track: mapper.track)
+        let key = "\(h.page.rawValue):\(mapper.track):\(mapper.model.machine(mapper.track).rawValue):"
+            + (0..<8).map { mapper.knobFace($0).value ?? "" }.joined(separator: "|")
         let now = CACurrentMediaTime()
+        if let old = scopeKey, old != key { lastEdit = now }
+        scopeKey = key
         if scope != stageScope {
-            if stageScope != nil { lastEdit = now }
             stageScope = scope
             setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2))
         }
@@ -220,6 +224,7 @@ final class TrigStripView: NSView, TopStrip {
     private var stageStep: Int?
     private var jump: [Double] = Array(repeating: 0, count: 8)   // each figure's height above the floor, 0...1
     private var stageScope: PageScope?
+    private var scopeKey: String?
     private var lastEdit = -100.0
     private var lastHit: [Double] = Array(repeating: -100, count: 8)
     static let scopeShown = 4.0                                  // seconds the page's picture stays after an edit

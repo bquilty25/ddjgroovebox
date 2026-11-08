@@ -105,11 +105,13 @@ export class StripView {
         const p0 = input.rows?.[0]?.playhead;
         this.stageStep = h.playing && p0 != null ? p0 % 16 : null;
         // the page's picture: shown while the page, the track or a value on it changes, and a few seconds after
-        const scope = input.scope ?? null;
-        if (!scopeEquals(scope, this.stageScope)) {
-            if (this.stageScope) this.lastEdit = now;
-            this.stageScope = scope;
-        }
+        // (scopeKey, when given: what the knobs show; the scope itself is drawn from the live values)
+        const scope = input.scope ?? null, key = input.scopeKey ?? null;
+        if (key !== null) {
+            if (this.scopeKey != null && key !== this.scopeKey) this.lastEdit = now;
+            this.scopeKey = key;
+        } else if (!scopeEquals(scope, this.stageScope) && this.stageScope) this.lastEdit = now;
+        this.stageScope = scope;
         // the pack browser (MASTER page, BROWSE): shown while browsing and a few seconds after
         const pk = input.packs ?? {};
         this.packs = pk.names ?? [];

@@ -308,14 +308,26 @@ function drawMaster(g, sc, r, c) {
 
 // TRIG: the note
 function drawTrig(g, sc, r, c) {
-    const n = sc.normalised;
-    const len = 0.05 + n[2] * 0.9, vel = n[1];
-    const bar = new Rect(r.minX, r.maxY - vel * r.h, len * r.w, vel * r.h);
-    fillRect(g, bar, col(c, 0.35));
-    fillRect(g, new Rect(bar.minX, bar.minY, bar.w, 3), c);
-    const rt = sc.raw[3];
-    if (rt > 0) {
-        for (let k = 0; k <= rt; k++) fillRect(g, new Rect(bar.minX + bar.w * k / (rt + 1), bar.minY, 2, bar.h), S.fg);
+    // the note: a bar as long as LENGTH, as high as VELOCITY, moved by MICRO from the step's line; RETRIG splits it
+    // into hits whose heights follow RTRG VEL (RTRG RATE in the caption); COND and the numbers in the caption
+    const n = sc.normalised, raw = sc.raw, shown = sc.shown;
+    const top = r.minY + 34, h = r.maxY - top;               // (room for the note's name and the caption)
+    const start = r.minX + r.w * 0.12, shift = raw[7] / 23 * r.w * 0.1;
+    fillRect(g, new Rect(start, top, 1, h), S.s3);            // the step's line
+    const len = (0.05 + n[2] * 0.8) * r.w, vel = n[1];
+    const hits = raw[3] + 1, ramp = raw[5] / 64;
+    for (let k = 0; k < hits; k++) {
+        const f = hits > 1 ? k / (hits - 1) : 0;
+        const v = Math.max(0.04, Math.min(1, vel * (1 + ramp * f)));
+        const w = len / hits;
+        const b = new Rect(start + shift + k * w, r.maxY - v * h, Math.max(2, w - (hits > 1 ? 2 : 0)), v * h);
+        fillRect(g, b, col(c, 0.35));
+        fillRect(g, new Rect(b.minX, b.minY, b.w, 3), c);
     }
-    drawTextTop(g, sc.shown[0] ?? "", r.maxX, r.minY, 22, S.fg, true);
+    drawTextTop(g, shown[0] ?? "", r.maxX, r.minY, 22, S.fg, true);
+    const parts = ["VEL " + shown[1], "LEN " + shown[2]];
+    if (raw[3] > 0) parts.push(`x${raw[3] + 1} ${shown[4]}`);
+    if (raw[6] !== 0) parts.push(shown[6]);
+    if (raw[7] !== 0) parts.push("MICRO " + shown[7]);
+    drawTextTop(g, parts.join("  "), r.minX, r.minY + 6, 11, S.fg2);
 }

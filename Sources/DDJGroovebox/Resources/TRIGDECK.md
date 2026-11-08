@@ -5,7 +5,8 @@ what it does right now and shows its value: you never have to translate between 
 
 ## Your first minute
 
-1. Press **PLAY** (either deck). The deep house pattern TRIGDECK opens with starts.
+1. Press the left deck's **PLAY**: deck A's pattern, the deep house TRIGDECK opens with, starts (deck B waits with
+   techno; see *Two decks* below).
 2. Touch the **left jog's top** and move it: you are scratching deck A (kick, open hat, clap, closed hats) while the pattern runs
    on underneath. Let go: it drops back in time.
 3. Move the **crossfader** left and right: the pattern morphs into scene A and scene B. The middle is the pattern as
@@ -14,6 +15,27 @@ what it does right now and shows its value: you never have to translate between 
    breakdowns, builds). Do it again to take over.
 5. Press a **pad** (HOT CUE mode): a step of the active track turns on or off. Hold a pad and turn a coloured knob: that
    step alone gets that value (a parameter lock).
+
+## Two decks: DJ with your patterns
+
+Each deck plays a whole pattern: deck A's 8 tracks fill the top left of the screen, deck B's the top right, each under a
+header saying its pattern, whether it plays, which deck is **on air** (heard, its tempo) and which you are **editing**
+(outlined). Both decks run on one clock, so they stay in time.
+
+1. **PLAY** on a deck starts or stops that deck. With one deck playing, it works like a groovebox: edit as you like.
+2. **LOAD A / LOAD B** choose each deck's pattern (SHIFT: the previous one). Load the next pattern on the waiting deck.
+3. Press **PLAY on the waiting deck** (it says BLEND): it starts on the next bar, silent, and a blend begins. The
+   crossfader becomes the **Smart Fader** and the mixer's knobs become each deck's DJ EQ (HI, MID, LOW) and filter.
+4. Move the **crossfader** towards the new deck. One movement does the mix: the new deck comes in, the basses swap at
+   the middle (never two basslines at once), the old deck's highs and mids ease out, and the tempo glides from the old
+   pattern's to the new one's. The EQ knobs fine-tune it; each starts flat and takes over when you turn it through the
+   middle.
+5. Hold the crossfader on the new deck for a bar: the blend is done. The old deck stops, the new one is on air and
+   being edited, and the knobs edit patterns again (the crossfader is the scenes' again once it passes the middle).
+
+The **right BEAT SYNC** (EDIT A / EDIT B) chooses which deck the pads, knobs, jogs and TRK buttons edit, so you can
+change the waiting pattern before you blend it in, or the one on air while it plays. Clicking a track row on the other
+side does the same. SHIFT + right BEAT SYNC opens the MASTER page.
 
 ## Patterns to start from
 
@@ -74,20 +96,21 @@ kit the load replaced (again: back to the pack).
 | Pads in BEAT LOOP (**KEYS**) | play the active track live: 16 notes from its TRIG note; on a drum track, the deck's four tracks (top row loud, bottom row soft) |
 | Pads in BEAT JUMP (**TRACKS**) | the deck's four tracks: top row selects (hold: BROWSE makes it Euclidean, the jog rotates it, BROWSE press rolls the dice), bottom row: tap to mute or unmute, hold to mute only while held; SHIFT + tap solos the track (again: the mutes from before come back), SHIFT + hold solos it while held |
 | Pads in SAMPLER (**PATTERNS**) | patterns 1-8 (left), 9-16 (right): tap to queue (switches at the end of the pattern); SHIFT + tap copies the current pattern there |
-| HI, MID, LOW, FILTER | the 8 parameters of the page: channel 1 = A-D, channel 2 = E-H |
+| HI, MID, LOW, FILTER | the 8 parameters of the page: channel 1 = A-D, channel 2 = E-H. During a blend: each channel's deck's DJ EQ and filter (they start flat and take over through the middle) |
 | LOOP IN, LOOP OUT, RELOOP | pages: left deck TRIG, SRC, FLTR; right deck AMP, FX, LFO |
-| Right BEAT SYNC | the MASTER page (delay, reverb, compressor...); again: back |
+| Right BEAT SYNC | EDIT A / EDIT B: the deck the pads, knobs and jogs edit. SHIFT: the MASTER page (delay, reverb, compressor...); again: back |
 | CUE/LOOP CALL ◀ ▶ | left deck: previous / next track; right deck: step page (17-32...). **Track length:** SHIFT + right ◀ ▶ makes the active track a bar shorter / longer (16, 32, 48, 64 steps; a new bar starts as a copy of the one before); SHIFT + turn BROWSE changes it a step at a time (1 to 64, for polymetric loops like 12 or 7) |
-| A track's row in the strip on top | click it: that track becomes the active one |
-| LOAD ◀ ▶ | previous / next pattern |
+| A track's row in the strip on top | click it: that track becomes the active one (on the other side: that deck is edited) |
+| LOAD A / LOAD B | that deck's next pattern (SHIFT: the previous); at once if the deck is stopped, else when its pattern ends |
 | BROWSE | the machine (SRC page) or the track; press: audition the track |
-| PLAY | play / stop; SHIFT: back to the start |
+| PLAY | starts / stops its own deck; on the waiting deck while the other plays: BLEND (it starts on the next bar and the Smart Fader takes over); SHIFT: back to the start |
 | CUE | left: record live (pads in KEYS mode are recorded); right: tap tempo (SHIFT + TAP: back to the tempo from before the taps) |
 | Left BEAT SYNC | FILL while held; SHIFT: AUTOPILOT |
 | Jog, top touched | scratch the deck (slip); SHIFT + touch: resample the deck's last bar into a sample |
 | Jog, side | a dial around the deck's ring of four tracks (left jog: tracks 1-4, right jog: 5-8): the marker on the drawn jog turns with the platter, a quarter turn a track, and the quadrant it points into is the active track. Turning the other deck's jog a little brings the active track to that deck. With a step held: its micro timing; with a track's pad held: rotate it; SHIFT: nudge the tempo |
 | TEMPO sliders | left: tempo, right: swing; towards you (down, the "+" end) = faster / more, on screen as on the hardware (they take over once moved past the current value) |
 | Channel faders, TRIM | deck A / deck B level and drive |
+| Crossfader, in a blend | the Smart Fader: towards the new deck it does the mix (volumes, the basses swapped at the middle, highs and mids eased, the tempo gliding); held on the new deck for a bar, the blend is done |
 | Crossfader | scene A ← pattern → scene B. A scene is a set of parameter values (filters closed, more reverb...); the middle plays the pattern as written, and towards either end those parameters morph to the scene's values. Moving it (or holding a scene's CUE) shows each parameter a scene holds above the mixer: A's value, the written value, B's value, and where the crossfader puts it now. The app always starts in the middle: the crossfader takes over once it passes the middle |
 | Headphone CUE (held) | edit scene A / B: turn knobs while held; SHIFT + CUE clears the scene |
 | BEAT FX | FX SELECT: the next effect, SHIFT + FX SELECT the previous (FILTER, REVERB THROW, REPEAT, STUTTER, DELAY THROW, ECHO, CRUSH, DUB HOLD, FLANGER, PHASER, TRANS, AUTOPAN, REVERSE, HALF, NOISE, DISTORT, SWEEP; the timed ones follow the division, LEVEL/DEPTH sets feedback, depth or drive); BEAT ◀ ▶: its division (1/32 up to 1, 2 and 4 bars); the channel switch: deck A, deck B or master; LEVEL/DEPTH: amount; ON/OFF: press to switch it on, press again to switch it off |

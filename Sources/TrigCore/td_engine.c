@@ -949,6 +949,12 @@ void td_deck_eq(int deck, int band, float x)
     }
     td_unlock();
 }
+int td_deck_step(int deck, int track, int step)
+{
+    if (!ok_d(deck) || track < 0 || track >= TD_TRACKS || step < 0 || step >= TD_STEPS) return 0;
+    const td_step_t *st = &E.pat[E.dk[deck].pat].step[track][step];
+    return (st->trig ? 1 : 0) | (st->nlocks ? 2 : 0) | (st->trig && st->cond ? 4 : 0);
+}
 void td_deck_filter(int deck, float x)
 {
     td_lock();

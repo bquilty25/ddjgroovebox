@@ -46,7 +46,13 @@ function handle(e) {
     engine.apply(actions);
     if (actions.some((a) => a.type === "capture")) setTimeout(() => engine.captureTo(mapper.track), 50);
 }
-strip.onSelectTrack = (t) => { if (mapper) { force = true; engine.apply(mapper.select(t)); } };
+strip.onSelectTrack = (i) => {                                // (DJ decks: a row on the other side edits that deck)
+    if (!mapper) return;
+    force = true;
+    const d = i >> 3;
+    if (d !== engine.focus) engine.apply([{ type: "focus", deck: d }]);
+    engine.apply(mapper.select(i & 7));
+};
 ddj.onReset((c) => { if (mapper) { force = true; engine.apply(mapper.reset(c)); } });   // (a double-click on a knob)
 // the help line in the bar: what the control under the mouse does now (kept up to date while it stays there)
 let hovered = null;
@@ -107,15 +113,21 @@ function update() {
     const h = mapper.header;
     strip.update({
         header: h,
-        rows: Array.from({ length: 8 }, (_, t) => {
-            const n = engine.length(t), steps = new Array(n);
-            for (let s = 0; s < n; s++) {                 // 1: a trig, 2: locks, 4: a condition (not every time)
-                const v = engine.step(t, s);
-                steps[s] = (v.trig ? 1 : 0) | (v.locks ? 2 : 0) | (v.trig && v.cond !== 0 ? 4 : 0);
-            }
-            return { name: engine.machineName(engine.machine(t)), color: COLORS.track[t], active: t === mapper.track,
-                     muted: engine.muted(t), level: engine.trackLevel(t), steps, playhead: engine.playingStep(t) };
+        // (DJ decks) 16 rows: deck A's pattern's 8 tracks, then deck B's (steps: 1 trig, 2 locks, 4 a condition)
+        rows: Array.from({ length: 16 }, (_, i) => {
+            const d = i >> 3, t = i & 7, row = engine.deckRow(d, t), steps = new Array(row.length);
+            for (let s = 0; s < row.length; s++) steps[s] = engine.deckStep(d, t, s);
+            return { name: engine.machineName(row.machine), color: COLORS.track[t], active: d === engine.focus && t === mapper.track,
+                     muted: row.muted, level: row.level, steps, playhead: row.step >= 0 ? row.step : null };
         }),
+        decks: [0, 1].map((d) => {
+            const p = engine.deckPattern(d), q = engine.deckQueued(d), nm = (x) => `P${String(x + 1).padStart(2, "0")} ${engine.patternName(x)}`.trim();
+            return { label: d === 0 ? "A" : "B", pattern: nm(p) + (q !== null ? " → " + nm(q) : ""), playing: engine.deckPlaying(d),
+                     onAir: engine.onAir === d, focus: engine.focus === d };
+        }),
+        focus: engine.focus, onAir: engine.onAir,
+        blend: engine.blending ? { to: engine.blendTo, x: engine.blendX, bpm: engine.bpm, bpmFrom: engine.blendTempos.from,
+                                   bpmTo: engine.blendTempos.to, gains: [engine.deckGains(0), engine.deckGains(1)] } : null,
         crossfader, autopilot: engine.autopilot, connected: !!midiIn, problem, sceneRows: sceneRows(),
         patternNames: Array.from({ length: 16 }, (_, p) => engine.patternName(p)),
         scope: readScope(engine, h.page, mapper.track, COLORS.track[mapper.track]),

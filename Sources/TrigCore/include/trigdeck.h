@@ -113,6 +113,7 @@ void td_on_air(int deck);                                /* the deck heard: its 
 void td_blend_fader(float x);
 void td_deck_eq(int deck, int band, float x);            /* the DJ EQ: band 0 low, 1 mid, 2 high; 0 kill, 0.5 flat, 1 +6 dB */
 void td_deck_filter(int deck, float x);                  /* the DJ filter: -1 low-pass .. 0 off .. 1 high-pass */
+int td_deck_step(int deck, int track, int step);         /* a deck's pattern's step, for the strip: 1 trig | 2 locks | 4 a condition */
 void td_restart(void);                                   /* back to step 1 (playing or not) */
 void td_set_tempo(float bpm);                            /* 30 .. 300 */
 void td_tap_tempo(void);

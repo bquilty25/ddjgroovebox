@@ -28,6 +28,7 @@ import { drawScope, scopeEquals } from "./scope.js";
 import { geometry, MIN_DESIGN_W } from "./ddjview.js";
 
 const SCOPE_SHOWN = 4.0;      // seconds the page's picture stays after an edit
+const DECK_HEAD = 20;         // (DJ decks) the height of each side's deck header
 const PAGE_MAP_SHOWN = 2.5;
 const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -39,6 +40,9 @@ export class StripView {
         this.columns = { mixerStart: G.mixerX / G.designW, rightStart: G.rightDeckX / G.designW };
         this.onSelectTrack = null;
         this.rows = [];
+        this.decks = [];
+        this.blend = null;
+        this.stageRows = [];
         this.center = null;
         this.stageLevels = new Array(8).fill(0);
         this.stageStep = null;
@@ -57,19 +61,20 @@ export class StripView {
         this.cssW = 0; this.cssH = 0; this.dpr = 1;
         this.now = () => performance.now() / 1000;
 
+        // (DJ decks) 16 rows: deck A's 8 tracks on the left (0-7), deck B's on the right (8-15)
         canvas.addEventListener("pointerdown", (e) => {
             if (e.button !== 0) return;
-            for (let t = 0; t < 8; t++) if (this.rowRect(t).contains(e.offsetX, e.offsetY)) { this.onSelectTrack?.(t); return; }
+            for (let t = 0; t < 16; t++) if (this.rowRect(t).contains(e.offsetX, e.offsetY)) { this.onSelectTrack?.(t); return; }
         });
         canvas.addEventListener("pointermove", (e) => {
             let over = false;
-            for (let t = 0; t < 8; t++) if (this.rowRect(t).contains(e.offsetX, e.offsetY)) over = true;
+            for (let t = 0; t < 16; t++) if (this.rowRect(t).contains(e.offsetX, e.offsetY)) over = true;
             canvas.style.cursor = over ? "pointer" : "";
         });
         document.fonts?.addEventListener?.("loadingdone", () => this.requestRedraw());
     }
 
-    preferredHeight(w) { return Math.round(w * 0.17); }
+    preferredHeight(w) { return Math.round(w * 0.2); }   // (DJ decks: 8 rows a side)
 
     resize(w, h) {
         this.cssW = w; this.cssH = h;
@@ -92,6 +97,10 @@ export class StripView {
             level: Math.round((r.level ?? 0) * 10), steps: r.steps?.length ? r.steps : [0], playhead: r.playhead ?? null,
             page: h.stepPage,
         }));
+        // (DJ decks) the two decks' headers; the blend (null: none)
+        this.decks = input.decks ?? [];
+        this.blend = input.blend ?? null;
+        this.focusDeck = input.focus ?? 0;
         const names = input.patternNames ?? [];                  // "P01 DEEP"
         const named = (p) => `P${pad2(p + 1)}` + (names[p] ? " " + names[p] : "");
         const pat = named(h.pattern) + (h.queued != null ? " → " + named(h.queued) : "");
@@ -102,9 +111,11 @@ export class StripView {
             crossfader: input.crossfader ?? 0.5, autopilot: !!input.autopilot, perf: h.perf ?? null,
             connected: !!input.connected, scene: h.sceneEdit ?? null, problem: input.problem ?? null,
         };
-        // the stage: each track's level (its figure jumps), the playhead, the transport
-        this.stageLevels = (input.rows ?? []).map((r) => r.level ?? 0);
-        const p0 = input.rows?.[0]?.playhead;
+        // the stage: each track's level (its figure jumps: the deck on air's), the playhead, the transport
+        const air = (input.onAir ?? 0) * 8, airRows = (input.rows ?? []).slice(air, air + 8);
+        this.stageRows = airRows.map((r) => ({ name: r.name, color: r.color, muted: !!r.muted }));
+        this.stageLevels = airRows.map((r) => r.level ?? 0);
+        const p0 = airRows[0]?.playhead;
         this.stageStep = h.playing && p0 != null ? p0 % 16 : null;
         // the page's picture: shown while the page, the track or a value on it changes, and a few seconds after
         // the scenes' picture: shown while the crossfader moves or a scene is being edited, and a few seconds after
@@ -145,11 +156,16 @@ export class StripView {
     get H() { return this.cssH || this.canvas.clientHeight; }
     get mixerX() { return Math.round(this.W * this.columns.mixerStart); }
     get rightX() { return Math.round(this.W * this.columns.rightStart); }
+    /** (DJ decks) row t: deck A's tracks 0-7 on the left, deck B's 8-15 on the right, under each side's header */
     rowRect(t) {
-        const rowH = (this.H - 16) / 4;
-        const x0 = t < 4 ? 8 : this.rightX + 8;
-        const colW = (t < 4 ? this.mixerX : this.W - this.rightX) - 16;
-        return new Rect(x0, 8 + (t % 4) * rowH, colW, rowH - 4);
+        const top = 8 + DECK_HEAD, rowH = (this.H - 8 - top) / 8;
+        const x0 = t < 8 ? 8 : this.rightX + 8;
+        const colW = (t < 8 ? this.mixerX : this.W - this.rightX) - 16;
+        return new Rect(x0, top + (t % 8) * rowH, colW, rowH - 2);
+    }
+    deckHeadRect(d) {
+        const x0 = d === 0 ? 8 : this.rightX + 8, colW = (d === 0 ? this.mixerX : this.W - this.rightX) - 16;
+        return new Rect(x0, 6, colW, DECK_HEAD - 2);
     }
     get centerRect() { return new Rect(this.mixerX + 10, 8, this.rightX - this.mixerX - 20, this.H - 16); }
     /** the empty middle of the strip, under the page line */
@@ -172,11 +188,24 @@ export class StripView {
         for (const x of [0.5, mx + 0.5, rx + 0.5, W - 0.5]) { g.moveTo(x, H); g.lineTo(x, 0.5); }
         g.moveTo(0, 0.5); g.lineTo(W, 0.5);
         g.stroke();
-        this.rows.forEach((r, t) => { if (t < 8) this._row(r, t + 1, this.rowRect(t)); });
+        this.decks.forEach((d, i) => this._deckHead(d, this.deckHeadRect(i)));
+        this.rows.forEach((r, t) => { if (t < 16) this._row(r, (t % 8) + 1, this.rowRect(t)); });
         if (this.center) this._center(this.centerRect);
         g.save();
         this._stage(this.stageRect);
         g.restore();
+    }
+
+    /** (DJ decks) a side's header: "A  P01 DEEP → P02", playing or not, on air, edited (outlined) */
+    _deckHead(d, r) {
+        const g = this.g;
+        if (d.focus) { g.strokeStyle = col(COLORS.page[6]); g.lineWidth = 1.5; g.strokeRect(r.x - 4, r.y - 2, r.w + 8, r.h + 2); }
+        let x = r.minX;
+        x += drawTextTop(g, d.label, x, r.minY + 1, 14, d.onAir ? S.fg : S.fg2) + 10;
+        x += drawTextTop(g, d.pattern, x, r.minY + 2, 12, d.playing ? S.fg : S.fg2) + 12;
+        const state = d.playing ? (d.onAir ? "▶ ON AIR" : "▶ PLAYING") : "■ WAITING";
+        drawTextTop(g, state, x, r.minY + 2, 12, d.playing ? TRACK4[1] : S.dim);
+        if (d.focus) drawTextTop(g, "EDITING", r.maxX, r.minY + 2, 12, COLORS.page[6], true);
     }
 
     _row(r, number, rect) {
@@ -303,7 +332,7 @@ export class StripView {
      *  not; the floor is the 16 steps with the playhead. */
     _stage(r) {
         const g = this.g;
-        if (r.h < 24 || this.rows.length !== 8) return;
+        if (r.h < 24 || (this.stageRows ?? []).length !== 8) return;
         const t = this.now();
         const dt = this.lastDraw == null ? 1 / 30 : Math.min(0.5, Math.max(0, t - this.lastDraw));
         this.lastDraw = t;
@@ -338,6 +367,8 @@ export class StripView {
             if (a >= 1) return;
             g.globalAlpha = 1 - a;
         }
+        // (DJ decks) a blend: the Smart Fader's picture, all through it
+        if (this.blend) { this._blend(inner); return; }
         // the scenes, while the crossfader moves or a scene is edited
         const sceneT = t - (this.sceneShown ?? -100);
         if (sceneT < SCOPE_SHOWN + 0.4) {
@@ -360,7 +391,7 @@ export class StripView {
         const cell = r.w / 8;
         const base = Math.min(r.h * 0.42, cell * 0.5);
         for (let i = 0; i < 8; i++) {
-            const row = this.rows[i];
+            const row = this.stageRows[i];
             const j = row.muted ? 0 : this.jump[i];
             const breathe = 1 + 0.04 * Math.sin(t * 2.2 + i);
             const wobble = this.center.perf ? Math.sin(t * 11 + i * 0.8) * 3 : 0;
@@ -392,12 +423,49 @@ export class StripView {
         }
     }
 
+    /** (DJ decks) The Smart Fader at work: each deck's volume and low / mid / high (the bass swapping in the middle),
+     *  the fader's position from the old deck to the new one, the tempo gliding between the two. */
+    _blend(r) {
+        const g = this.g, b = this.blend, to = b.to, from = 1 - to;
+        const name = (d) => (d === 0 ? "A" : "B");
+        const deckCol = [COLORS.sceneA, COLORS.sceneB];
+        const title = `BLEND ${name(from)} → ${name(to)}  ${Math.round(b.x * 100)}%`;
+        drawTextTop(g, title, r.midX - textWidth(title, 14) / 2, r.minY, 14, S.fg);
+        const tempo = Math.abs(b.bpmTo - b.bpmFrom) < 0.05 ? `${b.bpm.toFixed(0)} BPM`
+                    : `${b.bpmFrom.toFixed(0)} → ${b.bpmTo.toFixed(0)} BPM: ${b.bpm.toFixed(1)}`;
+        drawTextTop(g, tempo, r.midX - textWidth(tempo, 11) / 2, r.minY + 18, 11, S.fg2);
+        // the bars: per deck VOL, LOW, MID, HIGH (1: as is; a band up to +6 dB reaches the top)
+        const top = r.minY + 36, bh = Math.max(10, r.maxY - top - 26), half = r.w / 2;
+        for (const d of [0, 1]) {
+            const x0 = r.minX + d * half + 8, bw = (half - 16) / 4, gs = b.gains[d];
+            drawTextTop(g, `DECK ${name(d)}` + (d === to ? " (IN)" : " (OUT)"), x0, top - 2, 11, deckCol[d]);
+            const vals = [gs.gain, ...gs.bands];
+            ["VOL", "LOW", "MID", "HIGH"].forEach((lab, i) => {
+                const bx = x0 + i * bw + 2, v = Math.min(1, vals[i] / 1.5);
+                const bar = new Rect(bx, top + 14, bw - 6, bh - 14);
+                fillRect(g, bar, S.s2);
+                fillRect(g, new Rect(bar.minX, bar.maxY - v * bar.h, bar.w, v * bar.h), col(deckCol[d], i === 0 ? 1 : 0.7));
+                fillRect(g, new Rect(bar.minX, bar.maxY - bar.h / 1.5, bar.w, 1), S.fg2);   // (1: as is)
+                drawTextTop(g, lab, bar.midX - textWidth(lab, 9) / 2, bar.maxY + 2, 9, S.dim);
+            });
+        }
+        // the fader, the bass swap marked in the middle
+        const fy = r.maxY - 8, fx0 = r.minX + 20, fw = r.w - 40;
+        fillRect(g, new Rect(fx0, fy, fw, 3), S.s3);
+        fillRect(g, new Rect(fx0 + fw * 0.45, fy - 3, fw * 0.1, 9), col(S.fg2, 0.4));
+        const px = to === 1 ? fx0 + b.x * fw : fx0 + (1 - b.x) * fw;     // (the fader goes towards the new deck's side)
+        fillRect(g, new Rect(px - 2, fy - 5, 4, 13), S.fg);
+        drawTextTop(g, "A", fx0 - 14, fy - 5, 11, deckCol[0]);
+        drawTextTop(g, "B", fx0 + fw + 6, fy - 5, 11, deckCol[1]);
+    }
+
     /** The active track's step pages as blocks, the one on the pads lit, the playhead running through them. */
     _pageMap(r) {
         const g = this.g;
         const [page, pages, t] = this.stepPageSeen;
-        if (t >= this.rows.length || pages <= 0) return;
-        const row = this.rows[t], c = row.color, n = row.steps.length;
+        const ri = (this.focusDeck ?? 0) * 8 + t;            // (DJ decks: the deck edited's row)
+        if (ri >= this.rows.length || pages <= 0) return;
+        const row = this.rows[ri], c = row.color, n = row.steps.length;
         const title = `STEPS ${page * 16 + 1}-${Math.min(n, page * 16 + 16)}  ·  PAGE ${page + 1}/${pages}`
                     + `  ·  LENGTH ${n}  (SHIFT + PAGE ±: A BAR)`;
         drawTextTop(g, title, r.midX - textWidth(title, 13) / 2, r.minY, 13, S.fg);

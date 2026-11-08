@@ -79,6 +79,8 @@ final class TrigEngine: TrigModel, InstrumentIO, @unchecked Sendable {
         return (Double(g), b)
     }
     var blendTempos: (from: Double, to: Double) { (Double(state.bpm_from), Double(state.bpm_to)) }
+    /// deck d's track t's step s, for the strip: 1 trig | 2 locks | 4 a condition
+    func deckStep(_ d: Int, _ t: Int, _ s: Int) -> UInt8 { UInt8(td_deck_step(Int32(d), Int32(t), Int32(s))) }
 
     private func tuple<T>(_ t: T, _ i: Int) -> Int32 {
         withUnsafeBytes(of: t) { $0.bindMemory(to: Int32.self)[i] }

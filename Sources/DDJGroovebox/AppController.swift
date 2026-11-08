@@ -313,7 +313,7 @@ final class AppController: NSObject, NSWindowDelegate {
         let packs: [(Double, DDJEvent)] = [                                     // DDJ_PACKS: the pack browser
             (0.3, DDJEvent(.play(.left), .press(true))),
             (0.4, DDJEvent(.play(.left), .press(false))),
-            (0.6, DDJEvent(.sync(.right), .press(true))),                       // the MASTER page
+            (0.6, DDJEvent(.sync(.right), .press(true), shifted: true)),        // the MASTER page (SHIFT)
             (0.7, DDJEvent(.sync(.right), .press(false))),
             (2.6, DDJEvent(.browse, .relative(1))),                             // 909
             (3.0, DDJEvent(.browsePress, .press(true))),                        // load it
@@ -329,8 +329,18 @@ final class AppController: NSObject, NSWindowDelegate {
             (2.9, DDJEvent(.callRight(.right), .press(true))),
             (3.0, DDJEvent(.callRight(.right), .press(false))),
         ]
+        let blend: [(Double, DDJEvent)] = [                                     // DDJ_BLEND: deck A into deck B
+            (0.3, DDJEvent(.play(.left), .press(true))),
+            (0.4, DDJEvent(.play(.left), .press(false))),
+            (0.6, DDJEvent(.crossfader, .absolute(0.5))),
+            (1.0, DDJEvent(.play(.right), .press(true))),                       // deck B: a blend
+            (1.1, DDJEvent(.play(.right), .press(false))),
+            (1.6, DDJEvent(.crossfader, .absolute(0.75))),                      // the Smart Fader half way
+            (1.8, DDJEvent(.eqLow(.left), .absolute(0.5))),
+            (2.0, DDJEvent(.eqLow(.left), .absolute(0.2))),                     // deck A's lows down
+        ]
         let env = ProcessInfo.processInfo.environment
-        let trigScript = env["DDJ_PACKS"] != nil ? packs : env["DDJ_PAGES"] != nil ? pages : trig
+        let trigScript = env["DDJ_PACKS"] != nil ? packs : env["DDJ_PAGES"] != nil ? pages : env["DDJ_BLEND"] != nil ? blend : trig
         let script: [(Double, DDJEvent)] = instrument is TrigInstrument ? trigScript : [
             (0.5, DDJEvent(.pad(.right, 7), .press(true), padMode: .sampler)),
             (0.6, DDJEvent(.pad(.right, 7), .press(false), padMode: .sampler)),

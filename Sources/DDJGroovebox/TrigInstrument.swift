@@ -23,10 +23,11 @@ final class TrigInstrument: Instrument {
     init(projectURL: URL) {
         engine = TrigEngine(projectURL: projectURL)
         mapper = TrigMapper(model: engine)
-        stripView.onSelectTrack = { [weak self] t in
+        stripView.onSelectTrack = { [weak self] i in                  // (DJ decks: a row on the other side edits that deck)
             guard let self else { return }
             self.forceUpdate = true
-            self.engine.apply(self.mapper.select(track: t))
+            if i / 8 != self.engine.focus { self.engine.apply([.focus(i / 8)]) }
+            self.engine.apply(self.mapper.select(track: i % 8))
         }
     }
 
@@ -145,29 +146,51 @@ final class TrigStripView: NSView, TopStrip {
 
     override func mouseDown(with event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        if let t = (0..<8).first(where: { rowRect($0).contains(p) }) { onSelectTrack?(t) }
+        if let t = (0..<16).first(where: { rowRect($0).contains(p) }) { onSelectTrack?(t) }
     }
 
     override func resetCursorRects() {
-        for t in 0..<8 { addCursorRect(rowRect(t), cursor: .pointingHand) }
+        for t in 0..<16 { addCursorRect(rowRect(t), cursor: .pointingHand) }
     }
 
-    func preferredHeight(forWidth w: CGFloat, backing: CGFloat) -> CGFloat { (w * 0.17).rounded() }
+    func preferredHeight(forWidth w: CGFloat, backing: CGFloat) -> CGFloat { (w * 0.2).rounded() }   // (8 rows a side)
+
+    /// (DJ decks) a side's header
+    struct DeckHead: Equatable { var label: String, pattern: String, playing: Bool, onAir: Bool, focus: Bool }
+    private var decks: [DeckHead] = []
+    /// (DJ decks) the blend's picture: to, x, the tempos, each deck's gain and bands
+    struct BlendInfo: Equatable { var to: Int, x: Double, bpm: Double, from: Double, toBPM: Double, gains: [Double], bands: [[Double]] }
+    private var blend: BlendInfo?
+    private var focusDeck = 0
+    private var stageRows: [TrackRow] = []
 
     func update(engine: TrigEngine, mapper: TrigMapper, connected: Bool, problem: String? = nil, meters: Bool = true) {
         let page = mapper.stepPage
-        let new: [TrackRow] = (0..<8).map { t in
-            let level = meters || t >= rows.count ? Int((engine.trackLevel(t) * 10).rounded()) : rows[t].level
-            let len = max(1, engine.length(t))
-            let steps: [UInt8] = (0..<len).map { s in
-                let v = engine.step(track: t, step: s)
-                // 1: a trig, 2: locks, 4: a condition (it plays only some times: drawn half full)
-                return (v.trig ? 1 : 0) | (v.locks > 0 ? 2 : 0) | (v.trig && v.cond != 0 ? 4 : 0)
-            }
-            return TrackRow(name: engine.machineName(engine.machine(t).rawValue), color: TrigColors.track[t],
-                            active: t == mapper.track, muted: engine.muted(t),
-                            level: level, steps: steps, playhead: engine.playingStep(t), page: page)
+        // (DJ decks) 16 rows: deck A's pattern's 8 tracks, then deck B's (steps: 1 trig, 2 locks, 4 a condition)
+        let new: [TrackRow] = (0..<16).map { i in
+            let d = i / 8, t = i % 8, row = engine.deckRow(d, t)
+            let level = meters || i >= rows.count ? Int((row.level * 10).rounded()) : rows[i].level
+            let len = max(1, row.length)
+            return TrackRow(name: engine.machineName(row.machine), color: TrigColors.track[t],
+                            active: d == engine.focus && t == mapper.track, muted: row.muted,
+                            level: level, steps: (0..<len).map { engine.deckStep(d, t, $0) },
+                            playhead: row.step >= 0 ? row.step : nil, page: page)
         }
+        func nm(_ p: Int) -> String {
+            let n = engine.patternName(p)
+            return String(format: "P%02d", p + 1) + (n.isEmpty ? "" : " " + n)
+        }
+        let newDecks = (0..<2).map { d in
+            DeckHead(label: d == 0 ? "A" : "B", pattern: nm(engine.deckPattern(d)) + (engine.deckQueued(d).map { " → " + nm($0) } ?? ""),
+                     playing: engine.deckPlaying(d), onAir: engine.onAir == d, focus: engine.focus == d)
+        }
+        if newDecks != decks { decks = newDecks; for d in 0..<2 { setNeedsDisplay(deckHeadRect(d).insetBy(dx: -6, dy: -4)) } }
+        focusDeck = engine.focus
+        blend = engine.blending ? BlendInfo(to: engine.blendTo, x: engine.blendX, bpm: engine.bpm, from: engine.blendTempos.from,
+                                            toBPM: engine.blendTempos.to, gains: [0, 1].map { engine.deckGains($0).gain },
+                                            bands: [0, 1].map { engine.deckGains($0).bands }) : nil
+        if blend != nil { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
+        stageRows = Array(new[engine.onAir * 8 ..< engine.onAir * 8 + 8])
         let h = mapper.header
         var c = CenterInfo()
         func named(_ p: Int) -> String {                              // "P01 DEEP"
@@ -185,9 +208,10 @@ final class TrigStripView: NSView, TopStrip {
         c.connected = connected
         c.scene = h.sceneEdit
         c.problem = problem
-        // the stage: each track's level (its figure jumps), the playhead, the transport
-        let levels = (0..<8).map { engine.trackLevel($0) }
-        let step = engine.playingStep(0).map { $0 % 16 }
+        // the stage: each track's level (its figure jumps: the deck on air's), the playhead, the transport
+        let levels = (0..<8).map { engine.deckRow(engine.onAir, $0).level }
+        let s0 = engine.deckRow(engine.onAir, 0).step
+        let step: Int? = s0 >= 0 ? s0 % 16 : nil
         animFrame += 1
         let moving = h.playing || levels.contains { $0 > 0.005 } || h.perf != nil
         if (moving || animFrame % 3 == 0) && animFrame % 2 == 0 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
@@ -233,7 +257,7 @@ final class TrigStripView: NSView, TopStrip {
         if mapper.now() - packBrowsed < Self.scopeShown + 0.5 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
         // only what changed: a track's row, or the middle
         if rows.count != new.count { rows = new; center = c; needsDisplay = true; return }
-        for t in 0..<8 where rows[t] != new[t] { setNeedsDisplay(rowRect(t).insetBy(dx: -2, dy: -2)) }
+        for t in 0..<16 where rows[t] != new[t] { setNeedsDisplay(rowRect(t).insetBy(dx: -2, dy: -2)) }
         if c != center { setNeedsDisplay(centerRect.insetBy(dx: -2, dy: -2)) }
         rows = new
         center = c
@@ -335,8 +359,9 @@ final class TrigStripView: NSView, TopStrip {
     /// The active track's step pages as blocks, the one on the pads lit, the playhead running through them.
     private func drawPageMap(_ g: CGContext, _ r: CGRect) {
         let (page, pages, t) = stepPageSeen
-        guard t < rows.count, pages > 0 else { return }
-        let row = rows[t], c = NSColor(argb: row.color)
+        let ri = focusDeck * 8 + t                                    // (DJ decks: the deck edited's row)
+        guard ri < rows.count, pages > 0 else { return }
+        let row = rows[ri], c = NSColor(argb: row.color)
         let title = NSAttributedString(string: "STEPS \(page * 16 + 1)-\(min(row.steps.count, page * 16 + 16))  ·  PAGE \(page + 1)/\(pages)"
                                        + "  ·  LENGTH \(row.steps.count)  (SHIFT + PAGE ±: A BAR)",
                                        attributes: [.font: SloopStyle.font(13), .foregroundColor: SloopStyle.fg])
@@ -429,7 +454,7 @@ final class TrigStripView: NSView, TopStrip {
     /// The stage: one little figure per track, in its colour and its machine's shape, jumping when it plays, blinking
     /// when it does not; the floor is the 16 steps with the playhead.
     private func drawStage(_ g: CGContext, _ r: CGRect) {
-        guard r.height >= 24, rows.count == 8 else { return }
+        guard r.height >= 24, stageRows.count == 8 else { return }
         let t = CACurrentMediaTime()
         let floorY = r.maxY - 6
         // the floor: 16 steps
@@ -468,6 +493,11 @@ final class TrigStripView: NSView, TopStrip {
             if a >= 1 { return }
             g.setAlpha(1 - a)
         }
+        // (DJ decks) a blend: the Smart Fader's picture, all through it
+        if let b = blend {
+            drawBlend(g, CGRect(x: r.minX, y: r.minY, width: r.width, height: floorY - r.minY - 2), b)
+            return
+        }
         // the scenes, while the crossfader moves or a scene is edited
         let sceneT = t - sceneShown
         if sceneT < Self.scopeShown + 0.4 {
@@ -494,7 +524,7 @@ final class TrigStripView: NSView, TopStrip {
         let cell = r.width / 8
         let base = min(r.height * 0.42, cell * 0.5)
         for i in 0..<8 {
-            let row = rows[i]
+            let row = stageRows[i]
             let j = row.muted ? 0 : jump[i]
             let breathe = 1 + 0.04 * sin(t * 2.2 + Double(i))
             let wobble = center.perf != nil ? CGFloat(sin(t * 11 + Double(i) * 0.8)) * 3 : 0
@@ -565,11 +595,66 @@ final class TrigStripView: NSView, TopStrip {
 
     private var mixerX: CGFloat { (bounds.width * DDJ400View.columnFractions.mixerStart).rounded() }
     private var rightX: CGFloat { (bounds.width * DDJ400View.columnFractions.rightStart).rounded() }
+    /// (DJ decks) row t: deck A's tracks 0-7 on the left, deck B's 8-15 on the right, under each side's header
+    private static let deckHead: CGFloat = 20
     private func rowRect(_ t: Int) -> CGRect {
-        let rowH = (bounds.height - 16) / 4
-        let x0: CGFloat = t < 4 ? 8 : rightX + 8
-        let colW = (t < 4 ? mixerX : bounds.width - rightX) - 16
-        return CGRect(x: x0, y: 8 + CGFloat(t % 4) * rowH, width: colW, height: rowH - 4)
+        let top = 8 + Self.deckHead, rowH = (bounds.height - 8 - top) / 8
+        let x0: CGFloat = t < 8 ? 8 : rightX + 8
+        let colW = (t < 8 ? mixerX : bounds.width - rightX) - 16
+        return CGRect(x: x0, y: top + CGFloat(t % 8) * rowH, width: colW, height: rowH - 2)
+    }
+    private func deckHeadRect(_ d: Int) -> CGRect {
+        let x0: CGFloat = d == 0 ? 8 : rightX + 8, colW = (d == 0 ? mixerX : bounds.width - rightX) - 16
+        return CGRect(x: x0, y: 6, width: colW, height: Self.deckHead - 2)
+    }
+    /// a side's header: "A  P01 DEEP → P02", playing or not, on air, edited (outlined)
+    private func drawDeckHead(_ g: CGContext, _ d: DeckHead, _ r: CGRect) {
+        if d.focus {
+            g.setStrokeColor(color(TrigColors.page[6]).cgColor); g.setLineWidth(1.5)
+            g.stroke(r.insetBy(dx: -4, dy: -1))
+        }
+        var x = r.minX
+        x += text(d.label, x, r.minY + 1, size: 14, d.onAir ? SloopStyle.fg : SloopStyle.fg2) + 10
+        x += text(d.pattern, x, r.minY + 2, size: 12, d.playing ? SloopStyle.fg : SloopStyle.fg2) + 12
+        _ = text(d.playing ? (d.onAir ? "▶ ON AIR" : "▶ PLAYING") : "■ WAITING", x, r.minY + 2, size: 12,
+                 d.playing ? SloopStyle.track[1] : SloopStyle.dim)
+        if d.focus { _ = text("EDITING", r.maxX, r.minY + 2, size: 12, color(TrigColors.page[6]), right: true) }
+    }
+    /// The Smart Fader at work (strip.js's _blend): each deck's volume and low / mid / high, the fader from the old
+    /// deck to the new one, the tempo gliding between the two.
+    private func drawBlend(_ g: CGContext, _ r: CGRect, _ b: BlendInfo) {
+        let to = b.to, from = 1 - to, deckCol = [TrigColors.sceneA, TrigColors.sceneB]
+        func name(_ d: Int) -> String { d == 0 ? "A" : "B" }
+        func centred(_ s: String, _ y: CGFloat, _ size: CGFloat, _ c: NSColor) {
+            let w = NSAttributedString(string: s, attributes: [.font: SloopStyle.font(size)]).size().width
+            _ = text(s, r.midX - w / 2, y, size: size, c)
+        }
+        centred("BLEND \(name(from)) → \(name(to))  \(Int((b.x * 100).rounded()))%", r.minY, 14, SloopStyle.fg)
+        centred(abs(b.toBPM - b.from) < 0.05 ? String(format: "%.0f BPM", b.bpm)
+                : String(format: "%.0f → %.0f BPM: %.1f", b.from, b.toBPM, b.bpm), r.minY + 18, 11, SloopStyle.fg2)
+        let top = r.minY + 36, bh = max(10, r.maxY - top - 26), half = r.width / 2
+        for d in 0..<2 {
+            let x0 = r.minX + CGFloat(d) * half + 8, bw = (half - 16) / 4
+            _ = text("DECK \(name(d))" + (d == to ? " (IN)" : " (OUT)"), x0, top - 2, size: 11, color(deckCol[d]))
+            let vals = [b.gains[d]] + b.bands[d]
+            for (i, lab) in ["VOL", "LOW", "MID", "HIGH"].enumerated() {
+                let bar = CGRect(x: x0 + CGFloat(i) * bw + 2, y: top + 14, width: bw - 6, height: bh - 14)
+                let v = CGFloat(min(1, vals[i] / 1.5))
+                g.setFillColor(SloopStyle.s2.cgColor); g.fill(bar)
+                g.setFillColor(color(deckCol[d], i == 0 ? 1 : 0.7).cgColor)
+                g.fill(CGRect(x: bar.minX, y: bar.maxY - v * bar.height, width: bar.width, height: v * bar.height))
+                g.setFillColor(SloopStyle.fg2.cgColor); g.fill(CGRect(x: bar.minX, y: bar.maxY - bar.height / 1.5, width: bar.width, height: 1))
+                let w = NSAttributedString(string: lab, attributes: [.font: SloopStyle.font(9)]).size().width
+                _ = text(lab, bar.midX - w / 2, bar.maxY + 2, size: 9, SloopStyle.dim)
+            }
+        }
+        let fy = r.maxY - 8, fx0 = r.minX + 20, fw = r.width - 40
+        g.setFillColor(SloopStyle.s3.cgColor); g.fill(CGRect(x: fx0, y: fy, width: fw, height: 3))
+        g.setFillColor(SloopStyle.fg2.withAlphaComponent(0.4).cgColor); g.fill(CGRect(x: fx0 + fw * 0.45, y: fy - 3, width: fw * 0.1, height: 9))
+        let px = to == 1 ? fx0 + CGFloat(b.x) * fw : fx0 + CGFloat(1 - b.x) * fw
+        g.setFillColor(SloopStyle.fg.cgColor); g.fill(CGRect(x: px - 2, y: fy - 5, width: 4, height: 13))
+        _ = text("A", fx0 - 14, fy - 5, size: 11, color(deckCol[0]))
+        _ = text("B", fx0 + fw + 6, fy - 5, size: 11, color(deckCol[1]))
     }
     private var centerRect: CGRect { CGRect(x: mixerX + 10, y: 8, width: rightX - mixerX - 20, height: bounds.height - 16) }
 
@@ -587,8 +672,9 @@ final class TrigStripView: NSView, TopStrip {
         g.move(to: CGPoint(x: 0, y: 0.5)); g.addLine(to: CGPoint(x: W, y: 0.5))
         g.strokePath()
 
-        for t in 0..<8 where t < rows.count && needsToDraw(rowRect(t)) {
-            drawRow(g, rows[t], number: t + 1, rect: rowRect(t))
+        for (d, h) in decks.enumerated() where needsToDraw(deckHeadRect(d).insetBy(dx: -6, dy: -4)) { drawDeckHead(g, h, deckHeadRect(d)) }
+        for t in 0..<16 where t < rows.count && needsToDraw(rowRect(t)) {
+            drawRow(g, rows[t], number: t % 8 + 1, rect: rowRect(t))
         }
         if needsToDraw(centerRect) { drawCenter(g, centerRect) }
         if needsToDraw(stageRect) { drawStage(g, stageRect) }

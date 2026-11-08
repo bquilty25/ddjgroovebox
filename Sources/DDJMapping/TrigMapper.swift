@@ -40,6 +40,10 @@ public final class TrigMapper {
 
     private var held: [DDJControl: Int] = [:]           // a step pad held -> its step
     private var heldTrackPads: [DDJControl: Int] = [:]  // TRACKS mode: a track's pad held -> the track
+    private var muteHolds: [DDJControl: (at: Double, before: [Bool])] = [:]   // a mute pad held: when, the mutes before
+    private var soloSaved: [Bool]?                         // the mutes before a solo (restored when it ends)
+    /// a mute or solo pad held at least this long (seconds) is temporary: letting go puts the tracks back
+    public static let holdToRestore = 0.4
     private var pressedPads: Set<DDJControl> = []
     private var euclidPulses: [Int: Int] = [:]
     private var rotateAcc: [Deck: Int] = [:]
@@ -187,6 +191,10 @@ public final class TrigMapper {
         if perfOn { out.append(perfAction(on: false)) }
         for d in touching { out.append(.scratch(deck: d.rawValue, touching: false, rate: 0)) }
         if nudgeLast != nil { out.append(.nudge(0)) }
+        if let h = muteHolds.values.min(by: { $0.at < $1.at }), now() - h.at >= Self.holdToRestore {
+            out += mutes(to: h.before)                           // (a temporary mute or solo ends with the hold)
+        }
+        muteHolds = [:]
         playing = [:]; held = [:]; setOnPress = []; edited = []; touching = []; fillHeld = false; perfOn = false
         heldTrackPads = [:]; rotateAcc = [:]; euclidPulses = [:]; pressedPads = []
         sceneEdit = nil; nudgeLast = nil; knobLast = [:]; knobAcc = [:]; tempoPicked = false; swingPicked = false
@@ -230,6 +238,25 @@ public final class TrigMapper {
 
     // MARK: pads
 
+    /// whether track t plays alone (it is on, every other track muted)
+    public func soloed(_ t: Int) -> Bool {
+        !model.muted(t) && (0..<8).allSatisfy { $0 == t || model.muted($0) }
+    }
+    /// the mutes that take the tracks from now to `target`
+    private func mutes(to target: [Bool]) -> [TrigAction] {
+        (0..<8).compactMap { model.muted($0) != target[$0] ? .mute(track: $0, on: target[$0]) : nil }
+    }
+    /// solo track t; on a soloed track: the mutes from before the solo come back
+    private func solo(_ t: Int, _ before: [Bool]) -> [TrigAction] {
+        if soloed(t) {
+            let back = soloSaved ?? Array(repeating: false, count: 8)
+            soloSaved = nil
+            return mutes(to: back)
+        }
+        if soloSaved == nil { soloSaved = before }               // (from one solo to the next: the first state stays)
+        return mutes(to: (0..<8).map { $0 != t })
+    }
+
     private func pad(_ deck: Deck, _ i: Int, _ e: DDJEvent) -> [TrigAction] {
         let c = e.control
         guard case .press(let down) = e.value else { return [] }
@@ -266,7 +293,17 @@ public final class TrigMapper {
                 heldTrackPads[c] = t
                 return selectTrack(t)
             }
-            return down ? [.mute(track: t, on: !model.muted(t))] : []
+            // the bottom row: a tap mutes / unmutes, SHIFT + a tap solos; held, either lasts only while held
+            if down {
+                let before = (0..<8).map { model.muted($0) }
+                muteHolds[c] = (now(), before)
+                if e.shifted { return solo(t, before) }
+                soloSaved = nil
+                return [.mute(track: t, on: !before[t])]
+            }
+            guard let h = muteHolds.removeValue(forKey: c), now() - h.at >= Self.holdToRestore else { return [] }
+            soloSaved = nil
+            return mutes(to: h.before)
         case .patterns:
             guard down else { return [] }
             let p = (deck == .left ? 0 : 8) + i
@@ -605,8 +642,9 @@ public final class TrigMapper {
                 return ControlFace(title: model.machineName(model.machine(t).rawValue), value: "\(t + 1)",
                                    color: TrigColors.track[t], light: t == track ? .on : .dim)
             }
-            let muted = model.muted(t)
-            return ControlFace(title: muted ? "MUTED" : "ON", color: TrigColors.track[t], light: muted ? .off : .dim)
+            let muted = model.muted(t), solo = soloed(t)
+            return ControlFace(title: muted ? "MUTED" : (solo ? "SOLO" : "ON"), color: TrigColors.track[t],
+                               light: muted ? .off : (solo ? .on : .dim))
         case .patterns:
             let p = (d == .left ? 0 : 8) + i
             return ControlFace(title: String(format: "P%02d", p + 1), light: p == model.pattern ? .on : .off,

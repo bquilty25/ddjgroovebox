@@ -72,7 +72,7 @@ kit the load replaced (again: back to the pack).
 | --- | --- |
 | Pads in HOT CUE (**STEPS**) | the active track's 16 steps (left deck 1-8, right deck 9-16). Tap: on / off. Hold + knob: lock. Hold + jog side: micro timing. Hold + BROWSE: condition. Hold + LOAD left / right: slide / accent |
 | Pads in BEAT LOOP (**KEYS**) | play the active track live: 16 notes from its TRIG note; on a drum track, the deck's four tracks (top row loud, bottom row soft) |
-| Pads in BEAT JUMP (**TRACKS**) | the deck's four tracks: top row selects (hold: BROWSE makes it Euclidean, the jog rotates it, BROWSE press rolls the dice), bottom row mutes |
+| Pads in BEAT JUMP (**TRACKS**) | the deck's four tracks: top row selects (hold: BROWSE makes it Euclidean, the jog rotates it, BROWSE press rolls the dice), bottom row: tap to mute or unmute, hold to mute only while held; SHIFT + tap solos the track (again: the mutes from before come back), SHIFT + hold solos it while held |
 | Pads in SAMPLER (**PATTERNS**) | patterns 1-8 (left), 9-16 (right): tap to queue (switches at the end of the pattern); SHIFT + tap copies the current pattern there |
 | HI, MID, LOW, FILTER | the 8 parameters of the page: channel 1 = A-D, channel 2 = E-H |
 | LOOP IN, LOOP OUT, RELOOP | pages: left deck TRIG, SRC, FLTR; right deck AMP, FX, LFO |

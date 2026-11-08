@@ -151,6 +151,32 @@ final class TrigMapperTests: XCTestCase {
         XCTAssertEqual(m.padFunction(.left), .steps, "each deck keeps its own mode")
     }
 
+    func testMuteHeldIsTemporary() {
+        XCTAssertEqual(send(.pad(.right, 5), .press(true), mode: .beatJump), [.mute(track: 5, on: true)])
+        clock += 1
+        XCTAssertEqual(send(.pad(.right, 5), .press(false), mode: .beatJump), [.mute(track: 5, on: false)], "held: back on")
+        XCTAssertFalse(model.muted(5))
+    }
+
+    func testSoloAndBack() {
+        tap(.pad(.left, 6), mode: .beatJump)                         // track 3 muted first
+        XCTAssertTrue(model.muted(2))
+        tap(.pad(.right, 4), mode: .beatJump, shifted: true)         // solo track 5
+        XCTAssertEqual((0..<8).filter { !model.muted($0) }, [4])
+        XCTAssertTrue(m.soloed(4))
+        XCTAssertEqual(m.face(.pad(.right, 4))?.title, "SOLO")
+        tap(.pad(.left, 4), mode: .beatJump, shifted: true)          // solo hops to track 1
+        XCTAssertEqual((0..<8).filter { !model.muted($0) }, [0])
+        tap(.pad(.left, 4), mode: .beatJump, shifted: true)          // again: the mutes from before the first solo
+        XCTAssertEqual((0..<8).filter { model.muted($0) }, [2])
+        // SHIFT held on a pad: a solo while held
+        send(.pad(.right, 7), .press(true), mode: .beatJump, shifted: true)
+        XCTAssertEqual((0..<8).filter { !model.muted($0) }, [7])
+        clock += 1
+        send(.pad(.right, 7), .press(false), mode: .beatJump, shifted: true)
+        XCTAssertEqual((0..<8).filter { model.muted($0) }, [2])
+    }
+
     func testKeysModeMelodicAndDrums() {
         send(.callRight(.left), .press(true)); send(.callRight(.left), .press(true))
         send(.callRight(.left), .press(true)); send(.callRight(.left), .press(true))   // track 5: SYNTH

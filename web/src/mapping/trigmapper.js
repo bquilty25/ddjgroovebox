@@ -40,6 +40,8 @@ const deckBase = (d) => (d === 0 ? 0 : 4);
 const inDeck = (d, t) => t >= deckBase(d) && t < deckBase(d) + 4;
 
 const defaultClock = () => performance.now() / 1000;
+/** a mute or solo pad held at least this long (seconds) is temporary: letting go puts the tracks back */
+export const HOLD_TO_RESTORE = 0.4;
 /** a knob with no parameter on this page: the Swift face's title, a long dash (U+2014) */
 const NO_PARAM = String.fromCharCode(0x2014);
 
@@ -51,6 +53,8 @@ export class TrigMapper {
     #modes = ["hotCue", "hotCue"];
     #held = new Map();             // a step pad held -> its step
     #heldTrackPads = new Map();    // TRACKS mode: a track's pad held -> the track
+    #muteHolds = new Map();        // a mute pad held -> { at, before: the 8 mutes before }
+    #soloSaved = null;             // the mutes before a solo (restored when it ends)
     #pressedPads = new Set();
     #euclidPulses = new Map();
     #rotateAcc = new Map();
@@ -277,6 +281,9 @@ export class TrigMapper {
         if (this.perfOn) out.push(this.#perfAction(false));
         for (const d of this.#touching) out.push({ type: "scratch", deck: d, touching: false, rate: 0 });
         if (this.#nudgeLast !== null) out.push({ type: "nudge", amount: 0 });
+        const holds = [...this.#muteHolds.values()].sort((a, b) => a.at - b.at);
+        if (holds.length && this.now() - holds[0].at >= HOLD_TO_RESTORE) out.push(...this.#mutesTo(holds[0].before));
+        this.#muteHolds = new Map();
         this.#playing = new Map(); this.#held = new Map(); this.#setOnPress = new Set(); this.#edited = new Set();
         this.#touching = new Set(); this.fillHeld = false; this.perfOn = false;
         this.#heldTrackPads = new Map(); this.#rotateAcc = new Map(); this.#euclidPulses = new Map();
@@ -321,6 +328,29 @@ export class TrigMapper {
     setPerfTarget(t) { this.perfTarget = clampInt(0, 2, t); }
 
     // MARK: pads
+
+    /** whether track t plays alone (it is on, every other track muted) */
+    soloed(t) {
+        if (this.model.muted(t)) return false;
+        for (let u = 0; u < 8; u++) if (u !== t && !this.model.muted(u)) return false;
+        return true;
+    }
+    /** the mutes that take the tracks from now to target (8 booleans) */
+    #mutesTo(target) {
+        const out = [];
+        for (let u = 0; u < 8; u++) if (this.model.muted(u) !== target[u]) out.push({ type: "mute", track: u, on: target[u] });
+        return out;
+    }
+    /** solo track t; on a soloed track: the mutes from before the solo come back */
+    #solo(t, before) {
+        if (this.soloed(t)) {
+            const back = this.#soloSaved ?? new Array(8).fill(false);
+            this.#soloSaved = null;
+            return this.#mutesTo(back);
+        }
+        if (this.#soloSaved === null) this.#soloSaved = before;   // (from one solo to the next: the first state stays)
+        return this.#mutesTo(Array.from({ length: 8 }, (_, u) => u !== t));
+    }
 
     #pad(deck, i, e) {
         const c = e.control;
@@ -367,7 +397,19 @@ export class TrigMapper {
                 this.#heldTrackPads.set(c, t);
                 return this.#selectTrack(t);
             }
-            return down ? [{ type: "mute", track: t, on: !model.muted(t) }] : [];
+            // the bottom row: a tap mutes / unmutes, SHIFT + a tap solos; held, either lasts only while held
+            if (down) {
+                const before = Array.from({ length: 8 }, (_, u) => model.muted(u));
+                this.#muteHolds.set(c, { at: this.now(), before });
+                if (e.shifted) return this.#solo(t, before);
+                this.#soloSaved = null;
+                return [{ type: "mute", track: t, on: !before[t] }];
+            }
+            const h = this.#muteHolds.get(c);
+            this.#muteHolds.delete(c);
+            if (!h || this.now() - h.at < HOLD_TO_RESTORE) return [];
+            this.#soloSaved = null;
+            return this.#mutesTo(h.before);
         }
         case "patterns": {
             if (!down) return [];
@@ -748,8 +790,8 @@ export class TrigMapper {
                 return face(model.machineName(model.machine(t)), { value: String(t + 1), color: COLORS.track[t],
                                                                    light: t === track ? ON : DIM });
             }
-            const muted = model.muted(t);
-            return face(muted ? "MUTED" : "ON", { color: COLORS.track[t], light: muted ? OFF : DIM });
+            const muted = model.muted(t), solo = this.soloed(t);
+            return face(muted ? "MUTED" : (solo ? "SOLO" : "ON"), { color: COLORS.track[t], light: muted ? OFF : (solo ? ON : DIM) });
         }
         case "patterns": {
             const p = (d === 0 ? 0 : 8) + i;

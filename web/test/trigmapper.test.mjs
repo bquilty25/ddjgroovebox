@@ -165,6 +165,34 @@ test("tracks mode selects and mutes", () => {
     assert.equal(m.padFunction(0), "steps", "each deck keeps its own mode");
 });
 
+test("a mute pad held is temporary", () => {
+    const { model, clock, send } = setUp();
+    assert.deepStrictEqual(send(C.pad(1, 5), press(true), { mode: "beatJump" }), [{ type: "mute", track: 5, on: true }]);
+    clock.t += 1;
+    assert.deepStrictEqual(send(C.pad(1, 5), press(false), { mode: "beatJump" }), [{ type: "mute", track: 5, on: false }]);
+    assert.equal(model.muted(5), false);
+});
+
+test("solo, solo hopping, and back to the mutes from before", () => {
+    const { m, model, clock, send, tap } = setUp();
+    const on = () => [0, 1, 2, 3, 4, 5, 6, 7].filter((t) => !model.muted(t));
+    const off = () => [0, 1, 2, 3, 4, 5, 6, 7].filter((t) => model.muted(t));
+    tap(C.pad(0, 6), { mode: "beatJump" });                              // track 3 muted first
+    tap(C.pad(1, 4), { mode: "beatJump", shifted: true });               // solo track 5
+    assert.deepStrictEqual(on(), [4]);
+    assert.equal(m.soloed(4), true);
+    assert.equal(m.face(C.pad(1, 4)).title, "SOLO");
+    tap(C.pad(0, 4), { mode: "beatJump", shifted: true });               // to track 1
+    assert.deepStrictEqual(on(), [0]);
+    tap(C.pad(0, 4), { mode: "beatJump", shifted: true });               // again: back
+    assert.deepStrictEqual(off(), [2]);
+    send(C.pad(1, 7), press(true), { mode: "beatJump", shifted: true }); // held: a solo while held
+    assert.deepStrictEqual(on(), [7]);
+    clock.t += 1;
+    send(C.pad(1, 7), press(false), { mode: "beatJump", shifted: true });
+    assert.deepStrictEqual(off(), [2]);
+});
+
 test("keys mode, melodic and drums", () => {
     const { model, send } = setUp();
     for (let i = 0; i < 4; i++) send(C.callRight(0), press(true));    // track 5: SYNTH

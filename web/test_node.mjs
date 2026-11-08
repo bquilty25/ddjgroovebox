@@ -2,7 +2,7 @@
 // The WebAssembly engine, checked in Node: it starts, plays P01 and P13 (their own tempos), at a sane level, and a
 // step toggled from outside is heard. Usage: node web/test_node.mjs
 import { readFileSync } from "node:fs";
-import { instantiate } from "./src/wasi.js";
+import { instantiate, loadProject, saveProject } from "./src/wasi.js";
 
 const bytes = readFileSync(new URL("./trigcore.wasm", import.meta.url));
 const x = instantiate(bytes);
@@ -40,6 +40,20 @@ const before = g[0 * 64 + 1];
 x.td_step_toggle(0, 1);
 const g2 = new Float32Array(x.memory.buffer, x.tdw_grid(), 8 * 64);
 check("a step toggled from the page", g2[0 * 64 + 1] === 1 - before);
+
+// a saved project into a fresh engine, as the AudioWorklet does at start (the first allocation can grow the memory:
+// a view taken before it was detached in Firefox: "attempting to access detached ArrayBuffer")
+x.td_set_tempo(133);
+const saved = saveProject(x);
+check(`the project saves (${saved?.length} bytes)`, saved && saved.length > 1000);
+for (let i = 0; i < 3; i++) {
+    const y = instantiate(bytes);
+    y.tdw_init();
+    let ok = false;
+    try { ok = loadProject(y, saved) === 0; } catch (e) { console.log("    " + e); }
+    y.tdw_state();
+    check(`a fresh engine loads it (${i + 1}): ${y.tdw_bpm().toFixed(0)} BPM`, ok && Math.abs(y.tdw_bpm() - 133) < 0.01);
+}
 
 console.log(fails ? `${fails} failed` : "all ok");
 process.exit(fails ? 1 : 0);

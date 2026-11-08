@@ -2,7 +2,7 @@
 // The TRIGDECK engine on the browser's audio thread. The page sends engine calls ({ calls: [[name, ...args]] }) and
 // save requests; this renders, and ~30 times a second posts a snapshot of the state (src/engine.js reads it): the
 // light part every time, the heavy part (steps, locks, scenes) when the pattern changed.
-import { instantiate } from "./src/wasi.js";
+import { instantiate, loadProject, saveProject } from "./src/wasi.js";
 
 class TrigdeckProcessor extends AudioWorkletProcessor {
     constructor(options) {
@@ -13,9 +13,8 @@ class TrigdeckProcessor extends AudioWorkletProcessor {
             this.x = instantiate(options.processorOptions.wasm);
             this.x.tdw_init();
             const saved = options.processorOptions.project;
-            if (saved && saved.length <= this.x.tdw_project_size()) {
-                new Uint8Array(this.x.memory.buffer, this.x.tdw_project_buf(), saved.length).set(saved);
-                if (this.x.tdw_project_load(saved.length) !== 0) this.port.postMessage({ error: "the saved project could not be read: the default patterns instead" });
+            if (saved && loadProject(this.x, saved) !== 0) {
+                this.port.postMessage({ error: "the saved project could not be read: the default patterns instead" });
             }
         } catch (err) {
             this.port.postMessage({ error: "the engine did not start: " + String(err) });
@@ -32,8 +31,8 @@ class TrigdeckProcessor extends AudioWorkletProcessor {
             if (typeof this.x[name] === "function") this.x[name](...args);
         }
         if (m.save) {
-            const n = this.x.tdw_project_save();
-            if (n > 0) this.port.postMessage({ project: new Uint8Array(this.x.memory.buffer, this.x.tdw_project_buf(), n).slice() });
+            const project = saveProject(this.x);
+            if (project) this.port.postMessage({ project });
         }
         if (m.calls?.length) this.post(false);                // (at once after an edit: the screen follows)
     }
@@ -43,7 +42,8 @@ class TrigdeckProcessor extends AudioWorkletProcessor {
         const hash = x.tdw_pattern_hash();
         const full = forceHeavy || hash !== this.hash;
         this.hash = hash;
-        const all = new Int32Array(x.memory.buffer, x.tdw_snapshot(full ? 1 : 0), x.tdw_snapshot_len(full ? 1 : 0));
+        const at = x.tdw_snapshot(full ? 1 : 0), len = x.tdw_snapshot_len(full ? 1 : 0);   // (calls before the view)
+        const all = new Int32Array(x.memory.buffer, at, len);
         const light = all.slice(0, x.tdw_snapshot_len(0));
         const msg = { light };
         if (full) msg.heavy = all.slice();

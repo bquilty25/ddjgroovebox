@@ -34,6 +34,23 @@ export async function instantiateAsync(bytes) {
     return instance.exports;
 }
 
+/** A project's bytes into the engine (0: loaded). Careful with the order: tdw_project_buf can allocate and so grow
+ * the memory, which detaches any view of the old buffer; the view is made after it. */
+export function loadProject(x, bytes) {
+    if (!bytes || bytes.length > x.tdw_project_size()) return -1;
+    const at = x.tdw_project_buf();
+    new Uint8Array(x.memory.buffer, at, bytes.length).set(bytes);
+    return x.tdw_project_load(bytes.length);
+}
+
+/** The engine's project as bytes (a copy), or null */
+export function saveProject(x) {
+    const n = x.tdw_project_save();
+    if (n <= 0) return null;
+    const at = x.tdw_project_buf();
+    return new Uint8Array(x.memory.buffer, at, n).slice();
+}
+
 /** A C string at ptr in the instance's memory */
 export function cString(x, ptr) {
     if (!ptr) return "";

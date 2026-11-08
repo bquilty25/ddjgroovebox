@@ -29,7 +29,17 @@ final class MIDIManager {
     var ddjDestinationName: String { ddjDestination == 0 ? "" : Self.name(of: ddjDestination) }
     private(set) var otherInputNames: [String] = []
 
-    static let deviceNameMatch = "DDJ-400"
+    /// the controllers it plays: the DDJ-400 and its successor the DDJ-FLX4 (the same MIDI, see `isFLX4`)
+    static let deviceNames = ["DDJ-400", "DDJ-FLX4"]
+    static func isDDJ(_ name: String) -> Bool { deviceNames.contains { name.localizedCaseInsensitiveContains($0) } }
+    /// the FLX4 wants a keep-alive SysEx every 200 ms (Mixxx's FLX4 script: "reverse engineered with Wireshark"; it
+    /// also makes it report its controls' positions)
+    var isFLX4: Bool { ddjDestinationName.localizedCaseInsensitiveContains("FLX4") }
+    static let flx4KeepAlive: [UInt8] = [0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x04, 0x05, 0x00, 0x50, 0x02, 0xF7]
+    func sendKeepAlive() {
+        guard ddjDestination != 0, isFLX4 else { return }
+        send([Self.flx4KeepAlive], to: ddjDestination)
+    }
 
     func start() {
         MIDIClientCreateWithBlock("DDJ Groovebox" as CFString, &client) { [weak self] notification in
@@ -57,7 +67,7 @@ final class MIDIManager {
             let src = MIDIGetSource(i)
             if src == virtualSource { continue }
             let name = Self.name(of: src)
-            if name.localizedCaseInsensitiveContains(Self.deviceNameMatch) {
+            if Self.isDDJ(name) {
                 if foundSource == 0 { foundSource = src }
             } else if !name.localizedCaseInsensitiveContains("DDJ Groovebox") {
                 others.insert(src)
@@ -66,7 +76,7 @@ final class MIDIManager {
         }
         for i in 0..<MIDIGetNumberOfDestinations() {
             let dst = MIDIGetDestination(i)
-            if Self.name(of: dst).localizedCaseInsensitiveContains(Self.deviceNameMatch) { foundDest = dst; break }
+            if Self.isDDJ(Self.name(of: dst)) { foundDest = dst; break }
         }
         if foundSource != ddjSource {
             if ddjSource != 0 { MIDIPortDisconnectSource(ddjInPort, ddjSource) }
@@ -110,6 +120,7 @@ final class MIDIManager {
     /// the DDJ-400 reports where its faders and knobs are (the request Mixxx sends at start)
     func requestControlPositions() {
         guard ddjDestination != 0 else { return }
+        if isFLX4 { send([Self.flx4KeepAlive], to: ddjDestination); return }    // (the FLX4's query: its keep-alive)
         send([[0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x02, 0x06, 0x00, 0x03, 0x01, 0xF7]], to: ddjDestination)
     }
 

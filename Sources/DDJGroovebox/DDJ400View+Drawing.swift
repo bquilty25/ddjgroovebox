@@ -469,7 +469,7 @@ extension DDJ400View {
         let r = Self.statusRect
         let dot = connected ? SloopStyle.track[1] : SloopStyle.track[3]
         guard let h = header else {
-            let s = connected ? "DDJ-400 CONNECTED" : "NO DDJ-400: CLICK TO PLAY"
+            let s = connected ? "DDJ CONNECTED" : "NO DDJ (400 / FLX4): CLICK TO PLAY"
             let w = textWidth(s, lblSize)
             let x0 = r.midX - (w + 10) / 2
             g.setFillColor(dot.cgColor)

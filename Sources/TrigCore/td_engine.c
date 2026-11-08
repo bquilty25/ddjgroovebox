@@ -25,6 +25,11 @@ static float g_dly_buf[TD_DLY * 2], g_thr_buf[TD_DLY * 2];
 static float g_perf[TD_PERF_BUF * 2];
 
 /* ---- the lock */
+#if defined(__wasm__)
+/* in a browser the engine lives in the AudioWorklet alone: every call arrives on its thread, nothing to lock */
+void td_lock(void) {}
+void td_unlock(void) {}
+#else
 static pthread_mutex_t g_mx;
 static pthread_once_t g_once = PTHREAD_ONCE_INIT;
 static void mx_init(void)
@@ -41,6 +46,7 @@ void td_lock(void)
     pthread_mutex_lock(&g_mx);
 }
 void td_unlock(void) { pthread_mutex_unlock(&g_mx); }
+#endif
 
 /* ---- denormals: flushed to zero while rendering */
 #if defined(__aarch64__)

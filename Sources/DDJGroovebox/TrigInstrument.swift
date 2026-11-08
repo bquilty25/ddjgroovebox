@@ -551,7 +551,7 @@ final class TrigStripView: NSView, TopStrip {
         // TRIGDECK, in the track colours
         var x = r.minX
         for (i, ch) in "TRIGDECK".enumerated() { x += text(String(ch), x, y, size: 16, color(TrigColors.track[i])) }
-        _ = text(c.connected ? "DDJ-400 ●" : "NO DDJ-400", r.maxX, y, size: 12, c.connected ? SloopStyle.track[1] : SloopStyle.dim, right: true)
+        _ = text(c.connected ? "DDJ ●" : "NO DDJ", r.maxX, y, size: 12, c.connected ? SloopStyle.track[1] : SloopStyle.dim, right: true)
         y += 22
         _ = text(c.bpm, r.minX, y, size: 32, SloopStyle.fg)
         _ = text("BPM", r.minX + 70, y + 14, size: 12, SloopStyle.dim)

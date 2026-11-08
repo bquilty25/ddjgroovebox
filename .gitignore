@@ -1,6 +1,7 @@
 .build/
 .build-c/
 build/
+web/trigcore.wasm
 .swiftpm/
 .DS_Store
 __pycache__/

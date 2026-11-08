@@ -156,7 +156,7 @@ final class AppController: NSObject, NSWindowDelegate {
     private func checkAnswered() {
         guard let t = positionsAsked, midi.connected, ProcessInfo.processInfo.systemUptime - t > 2 else { return }
         unanswered += 1
-        if unanswered >= 3 { setControllerProblem("DDJ-400 NOT RECEIVING (NO LEDS): UNPLUG IT AND PLUG IT BACK IN") }
+        if unanswered >= 3 { setControllerProblem("THE DDJ IS NOT RECEIVING (NO LEDS): UNPLUG IT AND PLUG IT BACK IN") }
         ask()
     }
 
@@ -173,6 +173,7 @@ final class AppController: NSObject, NSWindowDelegate {
         meterTick += 1
         if meterTick % 3 == 0 && !TrigInstrument.diag.contains("nometers") { ddjView.meters = m }   // (20 a second)
         if midi.connected { midi.sendToDDJ(ledWriter.messages(mapper: instrument.leds, meters: m)) }
+        if midi.connected && meterTick % 12 == 0 { midi.sendKeepAlive() }   // (a DDJ-FLX4: every 200 ms)
         if !Self.scripted { instrument.saveIfNeeded() }
     }
 

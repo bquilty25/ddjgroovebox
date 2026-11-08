@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { TrigMapper, DDJ400LEDWriter, FM1Keyboard } from "../src/mapping/index.js";
-import { C, ev, press, absolute, relative, OFF, DIM, ON, PAGE, MACHINE, COLORS, midiNoteName } from "../src/vocab.js";
+import { C, ev, press, absolute, relative, OFF, DIM, ON, PAGE, MACHINE, COLORS, midiNoteName, PERF_FX, PERF_MENU } from "../src/vocab.js";
 
 const stepView = (o = {}) => ({ trig: false, note: 60, velocity: 100, cond: 0, retrig: 0, micro: 0, locks: 0,
                                 slide: false, accent: false, ...o });
@@ -337,19 +337,32 @@ test("tempo soft takeover", () => {
 test("perf FX toggle, division, target", () => {
     const { m, send } = setUp();
     const perf = (fx, on, amount) => ({ type: "perf", fx, division: 3, target: 0, on, amount });
-    send(C.fxSelect, press(true));                                    // STUTTER
+    assert.equal(m.perfType, 5, "FILTER first");
+    send(C.fxSelect, press(true));                                    // REV THROW
     send(C.beatRight, press(true));                                   // 1/4
     send(C.fxChannel(0), press(true));                                // deck A
-    assert.deepStrictEqual(send(C.fxOnOff, press(true)), [perf(1, true, 0.6)]);
+    assert.deepStrictEqual(send(C.fxOnOff, press(true)), [perf(4, true, 0.6)]);
     assert.equal(m.perfOn, true);
     assert.deepStrictEqual(send(C.fxOnOff, press(false)), [], "a toggle: letting go keeps it on");
-    assert.deepStrictEqual(send(C.fxLevel, absolute(0.9)), [perf(1, true, 0.9)]);
-    assert.deepStrictEqual(send(C.fxOnOff, press(true)), [perf(1, false, 0.9)], "pressed again: off");
+    assert.deepStrictEqual(send(C.fxLevel, absolute(0.9)), [perf(4, true, 0.9)]);
+    assert.deepStrictEqual(send(C.fxOnOff, press(true)), [perf(4, false, 0.9)], "pressed again: off");
     assert.deepStrictEqual(send(C.fxOnOff, press(false)), []);
     // FX SELECT while one plays: the old one stops before the next starts (no throw left running)
     send(C.fxOnOff, press(true)); send(C.fxOnOff, press(false));
-    assert.deepStrictEqual(send(C.fxSelect, press(true)), [perf(1, false, 0.9), perf(2, true, 0.9)]);
-    assert.equal(m.header.perf, "TAPE STOP");
+    assert.deepStrictEqual(send(C.fxSelect, press(true)), [perf(4, false, 0.9), perf(0, true, 0.9)]);
+    assert.equal(m.header.perf, "REPEAT");
+});
+
+test("perf FX menu: FILTER first, no TAPE STOP, SHIFT goes back", () => {
+    const { m, send } = setUp();
+    const seen = [m.perfType];
+    for (let i = 1; i < PERF_MENU.length; i++) { send(C.fxSelect, press(true)); seen.push(m.perfType); }
+    assert.equal(new Set(seen).size, PERF_FX.length - 1);
+    assert.ok(!seen.includes(PERF_FX.indexOf("TAPE STOP")));
+    send(C.fxSelect, press(true));
+    assert.equal(m.perfType, 5, "round again");
+    send(C.fxSelect, press(true), { shifted: true });
+    assert.equal(m.perfType, PERF_FX.indexOf("SWEEP"), "SHIFT: back");
 });
 
 test("machine from BROWSE on the SRC page", () => {

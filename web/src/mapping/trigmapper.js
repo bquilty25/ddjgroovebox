@@ -4,7 +4,7 @@
 // colour, light). Pure logic over a TrigModel (see vocab.js). Names follow the Swift source.
 
 import {
-    C, DECKS, PAD_MODES, OFF, DIM, ON, face, parseControl, PAGE, TRIG_PAGES, PERF_FX, MACHINE, isMelodic, COLORS,
+    C, DECKS, PAD_MODES, OFF, DIM, ON, face, parseControl, PAGE, TRIG_PAGES, PERF_FX, PERF_MENU, MACHINE, isMelodic, COLORS,
     midiNoteName,
 } from "../vocab.js";
 
@@ -80,7 +80,7 @@ export class TrigMapper {
         this.stepPage = 0;
         this.fillHeld = false;
         this.sceneEdit = null;
-        this.perfType = 0;
+        this.perfType = PERF_MENU[0];
         this.perfDivision = 2;
         this.perfTarget = 2;
         this.perfAmount = 0.6;
@@ -208,7 +208,8 @@ export class TrigMapper {
         if (kind === "fxSelect" && pressed) {
             // while one plays: it stops, the next starts (a throw or DUB HOLD left on would never be turned off)
             const old = this.perfOn ? this.#perfAction(false) : null;
-            this.perfType = (this.perfType + (e.shifted ? PERF_COUNT - 1 : 1)) % PERF_COUNT;
+            const at = Math.max(0, PERF_MENU.indexOf(this.perfType));
+            this.perfType = PERF_MENU[(at + (e.shifted ? PERF_MENU.length - 1 : 1)) % PERF_MENU.length];
             return this.perfOn ? [old, this.#perfAction(true)] : [];
         }
         if (kind === "beatLeft" && pressed) {

@@ -300,18 +300,30 @@ final class TrigMapperTests: XCTestCase {
     }
 
     func testPerfFXToggleDivisionTarget() {
-        send(.fxSelect, .press(true))                                // STUTTER
+        XCTAssertEqual(m.perfType, PerfFX.filter.rawValue, "FILTER first")
+        send(.fxSelect, .press(true))                                // REV THROW
         send(.beatRight, .press(true))                               // 1/4
         send(.fxChannel(0), .press(true))                            // deck A
-        XCTAssertEqual(send(.fxOnOff, .press(true)), [.perf(fx: 1, division: 3, target: 0, on: true, amount: 0.6)])
+        XCTAssertEqual(send(.fxOnOff, .press(true)), [.perf(fx: 4, division: 3, target: 0, on: true, amount: 0.6)])
         XCTAssertEqual(send(.fxOnOff, .press(false)), [], "a toggle: letting go keeps it on")
-        XCTAssertEqual(send(.fxLevel, .absolute(0.9)), [.perf(fx: 1, division: 3, target: 0, on: true, amount: 0.9)])
-        XCTAssertEqual(send(.fxOnOff, .press(true)), [.perf(fx: 1, division: 3, target: 0, on: false, amount: 0.9)], "pressed again: off")
+        XCTAssertEqual(send(.fxLevel, .absolute(0.9)), [.perf(fx: 4, division: 3, target: 0, on: true, amount: 0.9)])
+        XCTAssertEqual(send(.fxOnOff, .press(true)), [.perf(fx: 4, division: 3, target: 0, on: false, amount: 0.9)], "pressed again: off")
         XCTAssertEqual(send(.fxOnOff, .press(false)), [])
         // FX SELECT while one plays: the old one stops before the next starts (no throw left running)
         send(.fxOnOff, .press(true)); send(.fxOnOff, .press(false))
-        XCTAssertEqual(send(.fxSelect, .press(true)), [.perf(fx: 1, division: 3, target: 0, on: false, amount: 0.9),
-                                                       .perf(fx: 2, division: 3, target: 0, on: true, amount: 0.9)])
+        XCTAssertEqual(send(.fxSelect, .press(true)), [.perf(fx: 4, division: 3, target: 0, on: false, amount: 0.9),
+                                                       .perf(fx: 0, division: 3, target: 0, on: true, amount: 0.9)])
+    }
+
+    func testPerfFXMenuSkipsTapeStop() {
+        var seen: [Int] = [m.perfType]
+        for _ in 1..<PerfFX.menu.count { send(.fxSelect, .press(true)); seen.append(m.perfType) }
+        XCTAssertEqual(Set(seen).count, PerfFX.allCases.count - 1)
+        XCTAssertFalse(seen.contains(PerfFX.tapeStop.rawValue))
+        send(.fxSelect, .press(true))
+        XCTAssertEqual(m.perfType, PerfFX.filter.rawValue, "round again")
+        send(.fxSelect, .press(true), shifted: true)
+        XCTAssertEqual(m.perfType, PerfFX.sweep.rawValue, "SHIFT: back")
     }
 
     func testMachineFromBrowseOnSrcPage() {

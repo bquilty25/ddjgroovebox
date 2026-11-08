@@ -69,6 +69,8 @@ export const TRIG_PAGES = ["TRIG", "SRC", "FLTR", "AMP", "FX", "LFO", "MASTER"];
 export const PAGE = { trig: 0, src: 1, fltr: 2, amp: 3, fx: 4, lfo: 5, master: 6 };
 export const PERF_FX = ["REPEAT", "STUTTER", "TAPE STOP", "DLY THROW", "REV THROW", "FILTER", "CRUSH", "DUB HOLD",
                         "ECHO", "FLANGER", "PHASER", "TRANS", "AUTOPAN", "REVERSE", "HALF", "NOISE", "DISTORT", "SWEEP"];
+/** FX SELECT's order, as indices into PERF_FX (FILTER first; TAPE STOP left out); Swift's PerfFX.menu */
+export const PERF_MENU = [5, 4, 0, 1, 3, 8, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17];
 export const MACHINE = { kick: 0, snare: 1, hat: 2, clap: 3, tom: 4, synth: 5, fm: 6, sample: 7 };
 export const isMelodic = (m) => m === MACHINE.synth || m === MACHINE.fm || m === MACHINE.sample;
 

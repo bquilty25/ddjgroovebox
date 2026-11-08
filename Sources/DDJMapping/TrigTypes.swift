@@ -14,6 +14,9 @@ public enum PerfFX: Int, CaseIterable, Hashable, Sendable {
         ["REPEAT", "STUTTER", "TAPE STOP", "DLY THROW", "REV THROW", "FILTER", "CRUSH", "DUB HOLD",
          "ECHO", "FLANGER", "PHASER", "TRANS", "AUTOPAN", "REVERSE", "HALF", "NOISE", "DISTORT", "SWEEP"][rawValue]
     }
+    /// FX SELECT's order (FILTER first; TAPE STOP left out). The raw values stay the engine's (td_perf_t).
+    public static let menu: [PerfFX] = [.filter, .reverbThrow, .repeat_, .stutter, .delayThrow, .echo, .crush, .dubHold,
+                                        .flanger, .phaser, .trans, .autopan, .reverse, .half, .noise, .distort, .sweep]
 }
 
 /// The engine's machines, in TrigCore's order (td_machine_t).

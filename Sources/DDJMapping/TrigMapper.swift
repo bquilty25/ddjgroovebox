@@ -35,7 +35,7 @@ public final class TrigMapper {
     private var modes: [Deck: PadMode] = [.left: .hotCue, .right: .hotCue]
     public private(set) var fillHeld = false
     public private(set) var sceneEdit: Int?
-    public private(set) var perfType = 0, perfDivision = 2, perfTarget = 2
+    public private(set) var perfType = PerfFX.menu[0].rawValue, perfDivision = 2, perfTarget = 2
     public private(set) var perfAmount = 0.6, perfOn = false
 
     private var held: [DDJControl: Int] = [:]           // a step pad held -> its step
@@ -140,7 +140,8 @@ public final class TrigMapper {
         case (.fxSelect, .press(true)):
             // while one plays: it stops, the next starts (a throw or DUB HOLD left on would never be turned off)
             let old = perfOn ? perfAction(on: false) : nil
-            perfType = (perfType + (e.shifted ? PerfFX.allCases.count - 1 : 1)) % PerfFX.allCases.count
+            let menu = PerfFX.menu, at = menu.firstIndex { $0.rawValue == perfType } ?? 0
+            perfType = menu[(at + (e.shifted ? menu.count - 1 : 1)) % menu.count].rawValue
             return perfOn ? [old!, perfAction(on: true)] : []
         case (.beatLeft, .press(true)): perfDivision = max(0, perfDivision - 1); return perfOn ? [perfAction(on: true)] : []
         case (.beatRight, .press(true)): perfDivision = min(Self.divisions.count - 1, perfDivision + 1); return perfOn ? [perfAction(on: true)] : []

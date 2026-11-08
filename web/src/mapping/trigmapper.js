@@ -718,7 +718,7 @@ export class TrigMapper {
         }
         case "trim": return face(d === 0 ? "DRIVE A" : "DRIVE B");
         case "channelFader": return face(d === 0 ? "DECK A" : "DECK B");
-        case "crossfader": return face("A ◀ SCENE ▶ B");
+        case "crossfader": return face("SCENE A ◀ AS WRITTEN ▶ SCENE B");
         case "tempo":
             if (d === 0) return face("TEMPO", { value: format0(model.bpm) });
             return face("SWING", { value: `${model.swing}%` });

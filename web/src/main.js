@@ -53,6 +53,22 @@ ddj.helpText = (c) => {
     return f ? [f.title, f.value].filter(Boolean).join(": ") : null;
 };
 
+/** every parameter the pattern's scenes hold: its name, range, scene A's and B's values (or null), its written value */
+function sceneRows() {
+    const rows = [];
+    for (let t = 0; t < 8; t++) {
+        for (let p = 0; p < 48; p++) {
+            const a = engine.scene(0, t, p), b = engine.scene(1, t, p);
+            if (a === null && b === null) continue;
+            const info = engine.info(t, p);
+            if (!info) continue;
+            rows.push({ label: `${t + 1} ${info.name}`, color: COLORS.track[t], min: info.min, max: info.max, a, b,
+                        base: engine.value(t, p) });
+        }
+    }
+    return rows;
+}
+
 // ---- the frame: the mapper's timed releases; the drawing 20 times a second (at once after an event)
 function update() {
     if (!mapper) { requestAnimationFrame(update); return; }
@@ -83,7 +99,7 @@ function update() {
             return { name: engine.machineName(engine.machine(t)), color: COLORS.track[t], active: t === mapper.track,
                      muted: engine.muted(t), level: engine.trackLevel(t), steps, playhead: engine.playingStep(t) };
         }),
-        crossfader, autopilot: engine.autopilot, connected: !!midiIn, problem,
+        crossfader, autopilot: engine.autopilot, connected: !!midiIn, problem, sceneRows: sceneRows(),
         scope: readScope(engine, h.page, mapper.track, COLORS.track[mapper.track]),
         // (the picture shows when what the knobs show changes: not a lock playing or an LFO moving)
         scopeKey: `${h.page}:${mapper.track}:${engine.machine(mapper.track)}:` +

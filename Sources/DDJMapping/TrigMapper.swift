@@ -578,7 +578,7 @@ public final class TrigMapper {
             return ControlFace(title: ["DECK A", "DECK B", "MASTER"][min(2, max(0, n))], light: perfTarget == n ? .on : .off)
         case .trim(let d): return ControlFace(title: d == .left ? "DRIVE A" : "DRIVE B")
         case .channelFader(let d): return ControlFace(title: d == .left ? "DECK A" : "DECK B")
-        case .crossfader: return ControlFace(title: "A ◀ SCENE ▶ B")
+        case .crossfader: return ControlFace(title: "SCENE A ◀ AS WRITTEN ▶ SCENE B")
         case .tempo(.left): return ControlFace(title: "TEMPO", value: String(format: "%.0f", model.bpm))
         case .tempo(.right): return ControlFace(title: "SWING", value: "\(model.swing)%")
         case .jog(let d), .jogTouch(let d):

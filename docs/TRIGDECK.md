@@ -88,7 +88,7 @@ kit the load replaced (again: back to the pack).
 | Jog, side | a dial around the deck's ring of four tracks (left jog: tracks 1-4, right jog: 5-8): the marker on the drawn jog turns with the platter, a quarter turn a track, and the quadrant it points into is the active track. Turning the other deck's jog a little brings the active track to that deck. With a step held: its micro timing; with a track's pad held: rotate it; SHIFT: nudge the tempo |
 | TEMPO sliders | left: tempo, right: swing; towards you (down, the "+" end) = faster / more, on screen as on the hardware (they take over once moved past the current value) |
 | Channel faders, TRIM | deck A / deck B level and drive |
-| Crossfader | scene A ← pattern → scene B |
+| Crossfader | scene A ← pattern → scene B. A scene is a set of parameter values (filters closed, more reverb...); the middle plays the pattern as written, and towards either end those parameters morph to the scene's values. Moving it (or holding a scene's CUE) shows each parameter a scene holds above the mixer: A's value, the written value, B's value, and where the crossfader puts it now |
 | Headphone CUE (held) | edit scene A / B: turn knobs while held; SHIFT + CUE clears the scene |
 | BEAT FX | FX SELECT: the next effect, SHIFT + FX SELECT the previous (FILTER, REVERB THROW, REPEAT, STUTTER, DELAY THROW, ECHO, CRUSH, DUB HOLD, FLANGER, PHASER, TRANS, AUTOPAN, REVERSE, HALF, NOISE, DISTORT, SWEEP; the timed ones follow the division, LEVEL/DEPTH sets feedback, depth or drive); BEAT ◀ ▶: its division (1/32 up to 1, 2 and 4 bars); the channel switch: deck A, deck B or master; LEVEL/DEPTH: amount; ON/OFF: press to switch it on, press again to switch it off |
 

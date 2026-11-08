@@ -122,7 +122,8 @@ function makeLayout(G) {
         add(C.headphoneCue(deck), "button", centered(x, 524, 42, 20), "CUE", "inside", above(92));
         add(C.channelFader(deck), "vfader", new Rect(x - 14, 562, 28, 86), n, "none", at(x, 549, 92), "inline");
     }
-    add(C.crossfader, "hfader", new Rect(mid - 56, 676, 112, 18), "CROSSFADER", "none", at(mid, 662, 200));
+    const xw = Math.round((G.rightColX - G.leftColX) * 0.8);   // (wide: it morphs between the scenes)
+    add(C.crossfader, "hfader", new Rect(mid - xw / 2, 676, xw, 18), "CROSSFADER", "none", at(mid, 662, xw + 60));
     add(C.headphoneLevel, "knob", circle(G.leftColMid, 360, 13), "MIXING", "below", above(58));
     const rx = G.rightColMid;
     add(C.beatLeft, "button", centered(rx - 21, 262, 36, 20), "◀", "inside", above(44));

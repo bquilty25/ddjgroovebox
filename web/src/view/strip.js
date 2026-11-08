@@ -105,6 +105,11 @@ export class StripView {
         const p0 = input.rows?.[0]?.playhead;
         this.stageStep = h.playing && p0 != null ? p0 % 16 : null;
         // the page's picture: shown while the page, the track or a value on it changes, and a few seconds after
+        // the scenes' picture: shown while the crossfader moves or a scene is being edited, and a few seconds after
+        this.sceneRows = input.sceneRows ?? [];
+        const xf = input.crossfader ?? 0.5;
+        if ((this.lastXf !== undefined && xf !== this.lastXf) || h.sceneEdit != null) this.sceneShown = now;
+        this.lastXf = xf;
         // (scopeKey, when given: what the knobs show; the scope itself is drawn from the live values)
         const scope = input.scope ?? null, key = input.scopeKey ?? null;
         if (key !== null) {
@@ -240,6 +245,46 @@ export class StripView {
         // (the scene morph is the controller's crossfader, drawn at the bottom of the mixer: not repeated here)
     }
 
+    /** The scenes: the crossfader's middle plays the pattern as written; towards A (left) or B (right) every
+     *  parameter a scene holds morphs to the scene's value. One row per parameter: A's value, the written value (a
+     *  thin line), B's value, and where the crossfader puts it now (the bright marker). */
+    _scenes(r) {
+        const g = this.g, rows = this.sceneRows ?? [], xf = this.center.crossfader ?? 0.5;
+        const amtA = xf < 0.5 ? (0.5 - xf) * 2 : 0, amtB = xf > 0.5 ? (xf - 0.5) * 2 : 0;
+        drawTextTop(g, "SCENE A", r.minX, r.minY, 12, COLORS.sceneA);
+        drawTextTop(g, "SCENE B", r.maxX, r.minY, 12, COLORS.sceneB, true);
+        const where = amtA > 0.005 ? `${Math.round(amtA * 100)}% TOWARDS A` : amtB > 0.005 ? `${Math.round(amtB * 100)}% TOWARDS B`
+                                                                                         : "THE PATTERN AS WRITTEN";
+        drawTextTop(g, where, r.midX - textWidth(where, 12) / 2, r.minY, 12, S.fg);
+        if (!rows.length) {
+            const lines = ["THIS PATTERN HAS NO SCENES.", "HOLD SCENE A OR SCENE B (THE CUE BUTTONS) AND TURN KNOBS:",
+                           "THE CROSSFADER THEN MORPHS THE SOUND TO THEM."];
+            lines.forEach((l, i) => drawTextTop(g, l, r.minX, r.minY + 30 + i * 16, 12, S.fg2));
+            return;
+        }
+        const top = r.minY + 22, rowH = 16, perCol = Math.max(1, Math.floor((r.maxY - top) / rowH));
+        const cols = rows.length > perCol ? 2 : 1, colW = (r.w - (cols - 1) * 16) / cols;   // (two columns when many)
+        const n = rows.length > perCol * cols ? perCol * cols - 1 : rows.length;   // (the last slot: "+N MORE")
+        const labelW = Math.min(130, colW * 0.42);
+        for (let i = 0; i < n; i++) {
+            const row = rows[i], y = top + (i % perCol) * rowH;
+            const x0 = r.minX + Math.floor(i / perCol) * (colW + 16), bx = x0 + labelW, bw = colW - labelW - 6;
+            const px = (v) => bx + (row.max > row.min ? (v - row.min) / (row.max - row.min) : 0.5) * bw;
+            drawTextTop(g, row.label, x0, y, 11, row.color);
+            fillRect(g, new Rect(bx, y + 6, bw, 1), S.s3);
+            if (row.a != null) fillRect(g, new Rect(px(row.a) - 2, y + 2, 4, 9), COLORS.sceneA);
+            if (row.b != null) fillRect(g, new Rect(px(row.b) - 2, y + 2, 4, 9), COLORS.sceneB);
+            fillRect(g, new Rect(px(row.base) - 0.5, y + 1, 1, 11), S.fg2);
+            let v = row.base;
+            if (amtA > 0 && row.a != null) v += (row.a - row.base) * amtA;
+            if (amtB > 0 && row.b != null) v += (row.b - row.base) * amtB;
+            fillRect(g, new Rect(px(v) - 1.5, y, 3, 13), S.fg);
+        }
+        if (rows.length > n) {
+            drawTextTop(g, `+${rows.length - n} MORE`, r.minX + Math.floor(n / perCol) * (colW + 16), top + (n % perCol) * rowH, 11, S.fg2);
+        }
+    }
+
     // MARK: - The stage
 
     /** One little figure per track, in its colour and its machine's shape, jumping when it plays, blinking when it does
@@ -278,6 +323,14 @@ export class StripView {
         if (paged < PAGE_MAP_SHOWN + 0.4) {
             const a = Math.min(1, (PAGE_MAP_SHOWN + 0.4 - paged) / 0.4);
             g.save(); g.globalAlpha = a; this._pageMap(inner); g.restore();
+            if (a >= 1) return;
+            g.globalAlpha = 1 - a;
+        }
+        // the scenes, while the crossfader moves or a scene is edited
+        const sceneT = t - (this.sceneShown ?? -100);
+        if (sceneT < SCOPE_SHOWN + 0.4) {
+            const a = Math.min(1, (SCOPE_SHOWN + 0.4 - sceneT) / 0.4);
+            g.save(); g.globalAlpha = a; this._scenes(inner); g.restore();
             if (a >= 1) return;
             g.globalAlpha = 1 - a;
         }

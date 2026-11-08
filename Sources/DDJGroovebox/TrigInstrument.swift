@@ -200,6 +200,14 @@ final class TrigStripView: NSView, TopStrip {
             setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2))
         }
         if now - lastEdit < Self.scopeShown + 0.5 && animFrame % 2 == 0 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
+        // the scenes' picture: shown while the crossfader moves or a scene is being edited, and a few seconds after
+        if let x = lastXf, x != c.crossfader { sceneShown = now }
+        if h.sceneEdit != nil { sceneShown = now }
+        lastXf = c.crossfader
+        if now - sceneShown < Self.scopeShown + 0.5 {
+            sceneRows = Self.sceneRows(mapper.model)
+            if animFrame % 2 == 0 { setNeedsDisplay(stageRect.insetBy(dx: -2, dy: -2)) }
+        }
         // the pack browser (MASTER page, BROWSE): shown while browsing and a few seconds after
         packs = mapper.model.packNames
         packCursor = mapper.packCursor
@@ -230,6 +238,72 @@ final class TrigStripView: NSView, TopStrip {
     private var jump: [Double] = Array(repeating: 0, count: 8)   // each figure's height above the floor, 0...1
     private var stageScope: PageScope?
     private var scopeKey: String?
+    private var sceneShown: Double = -100
+    private var lastXf: Double?
+    private var sceneRows: [SceneRow] = []
+
+    /// a parameter a scene holds: its name, range, scene A's and B's values (or nil), its written value
+    struct SceneRow { var label: String, color: UInt32, min: Int, max: Int, a: Int?, b: Int?, base: Int }
+
+    static func sceneRows(_ model: TrigModel) -> [SceneRow] {
+        var rows: [SceneRow] = []
+        for t in 0..<8 {
+            for p in 0..<48 {
+                let a = model.scene(0, track: t, param: p), b = model.scene(1, track: t, param: p)
+                guard a != nil || b != nil, let info = model.info(track: t, param: p) else { continue }
+                rows.append(SceneRow(label: "\(t + 1) \(info.name)", color: TrigColors.track[t], min: info.min, max: info.max,
+                                     a: a, b: b, base: model.value(track: t, param: p)))
+            }
+        }
+        return rows
+    }
+
+    /// The scenes: the crossfader's middle plays the pattern as written; towards A (left) or B (right) every parameter
+    /// a scene holds morphs to the scene's value. One row per parameter: A's value, the written value (a thin line),
+    /// B's value, and where the crossfader puts it now (the bright marker). (strip.js's _scenes)
+    private func drawScenes(_ g: CGContext, _ r: CGRect) {
+        let xf = center.crossfader
+        let amtA = xf < 0.5 ? (0.5 - xf) * 2 : 0, amtB = xf > 0.5 ? (xf - 0.5) * 2 : 0
+        _ = text("SCENE A", r.minX, r.minY, size: 12, color(TrigColors.sceneA))
+        _ = text("SCENE B", r.maxX, r.minY, size: 12, color(TrigColors.sceneB), right: true)
+        let whereNow = amtA > 0.005 ? "\(Int((amtA * 100).rounded()))% TOWARDS A"
+            : amtB > 0.005 ? "\(Int((amtB * 100).rounded()))% TOWARDS B" : "THE PATTERN AS WRITTEN"
+        let ww = NSAttributedString(string: whereNow, attributes: [.font: SloopStyle.font(12)]).size().width
+        _ = text(whereNow, r.midX - ww / 2, r.minY, size: 12, SloopStyle.fg)
+        if sceneRows.isEmpty {
+            let lines = ["THIS PATTERN HAS NO SCENES.", "HOLD SCENE A OR SCENE B (THE CUE BUTTONS) AND TURN KNOBS:",
+                         "THE CROSSFADER THEN MORPHS THE SOUND TO THEM."]
+            for (i, l) in lines.enumerated() { _ = text(l, r.minX, r.minY + 30 + CGFloat(i) * 16, size: 12, SloopStyle.fg2) }
+            return
+        }
+        let top = r.minY + 22, rowH: CGFloat = 16
+        let perCol = max(1, Int((r.maxY - top) / rowH))
+        let cols = sceneRows.count > perCol ? 2 : 1                   // (two columns when many)
+        let colW = (r.width - CGFloat(cols - 1) * 16) / CGFloat(cols)
+        let n = sceneRows.count > perCol * cols ? perCol * cols - 1 : sceneRows.count   // (the last slot: "+N MORE")
+        let labelW = min(130, colW * 0.42)
+        func fill(_ rect: CGRect, _ c: NSColor) { g.setFillColor(c.cgColor); g.fill(rect) }
+        for i in 0..<n {
+            let row = sceneRows[i], y = top + CGFloat(i % perCol) * rowH
+            let x0 = r.minX + CGFloat(i / perCol) * (colW + 16), bx = x0 + labelW, bw = colW - labelW - 6
+            func px(_ v: Double) -> CGFloat {
+                bx + CGFloat(row.max > row.min ? (v - Double(row.min)) / Double(row.max - row.min) : 0.5) * bw
+            }
+            _ = text(row.label, x0, y, size: 11, color(row.color))
+            fill(CGRect(x: bx, y: y + 6, width: bw, height: 1), SloopStyle.s3)
+            if let a = row.a { fill(CGRect(x: px(Double(a)) - 2, y: y + 2, width: 4, height: 9), color(TrigColors.sceneA)) }
+            if let b = row.b { fill(CGRect(x: px(Double(b)) - 2, y: y + 2, width: 4, height: 9), color(TrigColors.sceneB)) }
+            fill(CGRect(x: px(Double(row.base)) - 0.5, y: y + 1, width: 1, height: 11), SloopStyle.fg2)
+            var v = Double(row.base)
+            if amtA > 0, let a = row.a { v += (Double(a) - v) * amtA }
+            if amtB > 0, let b = row.b { v += (Double(b) - v) * amtB }
+            fill(CGRect(x: px(v) - 1.5, y: y, width: 3, height: 13), SloopStyle.fg)
+        }
+        if sceneRows.count > n {
+            _ = text("+\(sceneRows.count - n) MORE", r.minX + CGFloat(n / perCol) * (colW + 16), top + CGFloat(n % perCol) * rowH,
+                     size: 11, SloopStyle.fg2)
+        }
+    }
     private var lastEdit = -100.0
     private var lastHit: [Double] = Array(repeating: -100, count: 8)
     static let scopeShown = 4.0                                  // seconds the page's picture stays after an edit
@@ -376,6 +450,17 @@ final class TrigStripView: NSView, TopStrip {
             g.saveGState()
             g.setAlpha(a)
             drawPageMap(g, CGRect(x: r.minX, y: r.minY, width: r.width, height: floorY - r.minY - 2))
+            g.restoreGState()
+            if a >= 1 { return }
+            g.setAlpha(1 - a)
+        }
+        // the scenes, while the crossfader moves or a scene is edited
+        let sceneT = t - sceneShown
+        if sceneT < Self.scopeShown + 0.4 {
+            let a = CGFloat(min(1, (Self.scopeShown + 0.4 - sceneT) / 0.4))
+            g.saveGState()
+            g.setAlpha(a)
+            drawScenes(g, CGRect(x: r.minX, y: r.minY, width: r.width, height: floorY - r.minY - 2))
             g.restoreGState()
             if a >= 1 { return }
             g.setAlpha(1 - a)

@@ -547,8 +547,9 @@ public struct DeckTrackFace: Equatable {
             add(.channelFader(deck), .vfader, CGRect(x: x - 14, y: 562, width: 28, height: 86), n, .none,
                 .at(CGPoint(x: x, y: 549), width: 92), value: .inline)
         }
-        add(.crossfader, .hfader, CGRect(x: mid - 56, y: 676, width: 112, height: 18), "CROSSFADER", .none,
-            .at(CGPoint(x: mid, y: 662), width: 200))
+        let xw = ((rightColX - leftColX) * 0.8).rounded()       // (wide: it morphs between the scenes)
+        add(.crossfader, .hfader, CGRect(x: mid - xw / 2, y: 676, width: xw, height: 18), "CROSSFADER", .none,
+            .at(CGPoint(x: mid, y: 662), width: xw + 60))
 
         // left column: HEADPHONES MIXING (the LEVEL beside it is analogue: printed only)
         add(.headphoneLevel, .knob, circle(leftColMid, 360, 13), "MIXING", .below, .above(width: 58))

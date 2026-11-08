@@ -282,7 +282,7 @@ static void pat_house(void)
     /* 8 SAMPLE: the built-in vocal blip, every fourth bar */
     prm(7, SRC(SM_SLOT), 1);
     prm(7, P_LEVEL, 92); prm(7, P_DLY, 70); prm(7, P_REV, 50); prm(7, P_LOWCUT, 60); prm(7, P_PAN, -20);
-    trig(7, 7, 60, 100)->cond = TD_COND_AB + 7;                /* 3:4 */
+    trig(7, 7, 60, 100);                                       /* (every bar) */
 
     /* scene A: a filtered breakdown; scene B: driven and open */
     scene(0, 4, P_CUT, 26); scene(0, 5, P_CUT, 30); scene(0, 5, P_REV, 110); scene(0, 2, P_REV, 100);
@@ -366,7 +366,7 @@ static void pat_techno(void)
     trig(6, 0, 57, 90); trig(6, 3, 60, 70); trig(6, 7, 55, 80);
     /* 8 SAMPLE: the riser, every 8 bars */
     prm(7, SRC(SM_SLOT), 3); prm(7, P_LEVEL, 80); prm(7, P_REV, 50);
-    trig(7, 0, 60, 100)->cond = TD_COND_AB + 9;                /* 1:8 */
+    trig(7, 0, 60, 100)->cond = TD_COND_AB + 5;                /* 1:4 */
 
     scene(0, 0, P_LOWCUT, 70); scene(0, 4, P_LEVEL, 30); scene(0, 5, P_REV, 120); scene(0, 3, P_LEVEL, 50);
     scene(1, 0, SRC(KK_DRIVE), 100); scene(1, 5, P_CUT, 100); scene(1, 5, P_RES, 90); scene(1, 1, SRC(HH_DECAY), 100);
@@ -415,7 +415,7 @@ static void pat_garage(void)
     trig(6, 5, 69, 80); trig(6, 13, 72, 70)->cond = TD_COND_P1 + 4;
     /* 8 SAMPLE: the vocal, every other bar */
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 88); prm(7, P_DLY, 60); prm(7, P_REV, 40);
-    trig(7, 9, 60, 100)->cond = TD_COND_AB + 1;                /* 2:2 */
+    trig(7, 9, 60, 100);
 
     scene(0, 4, P_CUT, 30); scene(0, 5, P_REV, 110); scene(0, 0, P_LEVEL, 60);
     scene(1, 5, P_CUT, 110); scene(1, 4, P_ODRV, 60); scene(1, 3, P_LEVEL, 100);
@@ -446,7 +446,7 @@ static void pat_disco(void)
     trig(6, 14, 69, 96)->cond = TD_COND_AB + 1;                /* 2:2 */
     /* 8 SAMPLE: the vocal */
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 88); prm(7, P_DLY, 70);
-    trig(7, 7, 60, 100)->cond = TD_COND_AB + 7;                /* 3:4 */
+    trig(7, 7, 60, 100);                                       /* (every bar) */
 
     scene(0, 4, P_CUT, 30); scene(0, 5, P_CUT, 40); scene(0, 2, P_REV, 100);
     scene(1, 5, P_CUT, 110); scene(1, 4, P_CUT, 90); scene(1, 6, SRC(FM_INDEX), 110);
@@ -488,7 +488,7 @@ static void pat_breaks(void)
     trig(6, 6, 72, 80)->cond = TD_COND_P1 + 4;
     /* 8 SAMPLE: the vocal */
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 86); prm(7, P_DLY, 60);
-    trig(7, 13, 60, 100)->cond = TD_COND_AB + 5;               /* 1:4 */
+    trig(7, 13, 60, 100);
 
     scene(0, 0, P_LOWCUT, 60); scene(0, 5, P_REV, 120); scene(0, 2, P_REV, 90);
     scene(1, 2, SRC(SN_DRIVE), 80); scene(1, 4, P_CUT, 90); scene(1, 0, SRC(KK_DRIVE), 70);
@@ -592,7 +592,7 @@ static void pat_melodic(void)
     td_set_machine_x(P, 6, TD_M_SYNTH); synth_pad(6);
     pad4(6, &PROG_MELO, 80);
     prm(7, SRC(SM_SLOT), 3); prm(7, P_LEVEL, 76); prm(7, P_REV, 60);
-    trig(7, 0, 60, 100)->cond = TD_COND_AB + 9;                /* the riser, 1:8 */
+    trig(7, 0, 60, 100)->cond = TD_COND_AB + 5;                /* the riser, 1:4 */
     scene(0, 5, P_CUT, 26); scene(0, 0, P_LOWCUT, 80); scene(0, 6, P_REV, 127);
     scene(1, 5, P_CUT, 100); scene(1, 5, P_RES, 90); scene(1, 5, P_DLY, 100);
 }
@@ -611,7 +611,7 @@ static void pat_filter(void)
     prm(5, P_LSPD, 4); prm(5, P_LMUL, 1); prm(5, P_LWAVE, 0); prm(5, P_LDEST, 9); prm(5, P_LDEPTH, 40);   /* the sweep */
     pad4(5, &PROG_DISCO, 96);
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 86); prm(7, P_DLY, 70);
-    trig(7, 7, 60, 100)->cond = TD_COND_AB + 1;
+    trig(7, 7, 60, 100);
     scene(0, 5, P_CUT, 20); scene(0, 4, P_CUT, 30);
     scene(1, 5, P_CUT, 110); scene(1, 5, P_RES, 90);
 }
@@ -631,7 +631,7 @@ static void pat_jackin(void)
     prm(5, P_CHO, 50); prm(5, P_REV, 30);
     trig(5, 3, 57, 96); trig(5, 6, 57, 80); trig(5, 11, 62, 90); trig(5, 14, 60, 70)->cond = TD_COND_AB + 0;
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 90);
-    trig(7, 4, 60, 100)->cond = TD_COND_AB + 5;                /* 1:4 */
+    trig(7, 4, 60, 100);
     scene(0, 5, P_REV, 110); scene(0, 0, P_LOWCUT, 60);
     scene(1, 5, SRC(FM_INDEX), 90); scene(1, 4, P_CUT, 90);
 }
@@ -692,7 +692,7 @@ static void pat_prog(void)
     td_set_machine_x(P, 6, TD_M_SYNTH); synth_pad(6);
     pad4(6, &PROG_DEEP, 76);
     prm(7, SRC(SM_SLOT), 3); prm(7, P_LEVEL, 76); prm(7, P_REV, 60);
-    trig(7, 0, 60, 100)->cond = TD_COND_AB + 9;
+    trig(7, 0, 60, 100)->cond = TD_COND_AB + 5;                /* 1:4 */
     scene(0, 5, P_LEVEL, 30); scene(0, 0, P_LOWCUT, 70); scene(0, 6, P_CUT, 30);
     scene(1, 5, SRC(FM_INDEX), 80); scene(1, 6, P_CUT, 90);
 }
@@ -770,7 +770,7 @@ static void pat_speed(void)
     organ(5); prm(5, SRC(SY_CHORD), 1);
     trig(5, 3, 57, 90); trig(5, 11, 57, 84); trig(5, 14, 60, 70)->cond = TD_COND_AB + 0;
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 90); prm(7, P_DLY, 60);
-    trig(7, 6, 60, 100)->cond = TD_COND_AB + 1;
+    trig(7, 6, 60, 100);
     scene(0, 4, P_CUT, 26); scene(0, 0, P_LOWCUT, 60);
     scene(1, 4, P_CUT, 90); scene(1, 4, P_ODRV, 90); scene(1, 5, P_CUT, 110);
 }
@@ -796,7 +796,7 @@ static void pat_4x4(void)
     prm(6, P_LEVEL, 74); prm(6, P_PAN, 22);
     trig(6, 3, 60, 70); trig(6, 7, 60, 60); trig(6, 13, 60, 64)->cond = TD_COND_P1 + 4;
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 88); prm(7, P_DLY, 70);
-    trig(7, 12, 60, 100)->cond = TD_COND_AB + 5;
+    trig(7, 12, 60, 100);
     scene(0, 5, P_REV, 110); scene(0, 4, P_CUT, 30);
     scene(1, 5, SRC(FM_INDEX), 80); scene(1, 4, P_CUT, 100);
 }
@@ -875,7 +875,7 @@ static void pat_liquid(void)
     td_set_machine_x(P, 6, TD_M_SYNTH); synth_pad(6); prm(6, P_LEVEL, 64);
     pad4(6, &PROG_MELO, 70);
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 80); prm(7, P_DLY, 80); prm(7, P_REV, 70);
-    trig(7, 20, 60, 100)->cond = TD_COND_AB + 5;
+    trig(7, 20, 60, 100);
     scene(0, 0, P_LEVEL, 60); scene(0, 2, P_REV, 110); scene(0, 6, P_LEVEL, 100);
     scene(1, 5, SRC(FM_INDEX), 80); scene(1, 4, P_ODRV, 60);
 }
@@ -896,7 +896,7 @@ static void pat_neuro(void)
     prm(6, SRC(FM_ENVAMT), 100); prm(6, P_ADEC, 16); prm(6, P_ASUS, 0); prm(6, P_LEVEL, 72); prm(6, P_DLY, 40);
     trig(6, 11, 57, 90); trig(6, 15, 64, 70)->cond = TD_COND_AB + 0;
     prm(7, SRC(SM_SLOT), 3); prm(7, P_LEVEL, 70);
-    trig(7, 0, 60, 100)->cond = TD_COND_AB + 9;
+    trig(7, 0, 60, 100)->cond = TD_COND_AB + 5;                /* 1:4 */
     scene(0, 4, P_CUT, 20); scene(0, 4, P_LDEPTH, 0);
     scene(1, 4, P_CUT, 90); scene(1, 4, P_RES, 100); scene(1, 4, P_LDEPTH, 63);
 }
@@ -921,7 +921,7 @@ static void pat_jungle(void)
     trig(4, 0, 33, 110); trig(4, 24, 31, 100)->slide = 1; trig(4, 32, 29, 110); trig(4, 56, 28, 100)->slide = 1;
     td_set_machine_x(P, 6, TD_M_SYNTH); synth_pad(6); pad4(6, &PROG_DEEP, 70);
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 86); prm(7, P_DLY, 70); prm(7, P_REV, 60);
-    trig(7, 14, 60, 100)->cond = TD_COND_AB + 1;
+    trig(7, 14, 60, 100);
     scene(0, 0, P_LOWCUT, 70); scene(0, 2, P_REV, 110);
     scene(1, 2, SRC(SN_DRIVE), 90); scene(1, 4, P_ODRV, 70);
 }
@@ -1221,7 +1221,7 @@ static void pat_electro(void)
     trig(6, 7, 72, 90); trig(6, 15, 79, 80)->cond = TD_COND_AB + 0;
     /* 8 SAMPLE: the vocal blip */
     prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 86); prm(7, P_DLY, 50);
-    trig(7, 12, 60, 100)->cond = TD_COND_AB + 1;               /* 2:2 */
+    trig(7, 12, 60, 100);
 
     scene(0, 4, P_CUT, 24); scene(0, 2, P_REV, 110); scene(0, 1, P_LEVEL, 50);
     scene(1, 4, P_CUT, 90); scene(1, 4, P_RES, 90); scene(1, 6, SRC(FM_INDEX), 127); scene(1, 0, SRC(KK_DRIVE), 70);

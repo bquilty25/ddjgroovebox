@@ -735,6 +735,7 @@ TEST(test_capture_slices)
     td_play(0);
     td_set_machine(7, TD_M_SAMPLE);
     td_set_sample(7, 12);
+    td_param_set(7, P_SRC + SM_TUNE, 0);                       /* (the slot's own pitch: P01's track 8 is retuned) */
     td_param_set(7, P_SRC + SM_SLICES, 1);                    /* 4 */
     int notes4[5] = {60, 61, 63, 59, 64}, want_sl[5] = {0, 1, 3, 3, 0}, ok = 1;
     for (int k = 0; k < 5; k++) {
@@ -1195,8 +1196,18 @@ TEST(test_default_project)
 /* ---- sound packs */
 TEST(test_packs)
 {
-    check("26 packs, named", td_pack_count() == 26 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS")
-          && !strcmp(td_pack_name(15), "LIQUID") && !strcmp(td_pack_name(25), "ELECTRO"));
+    check("27 packs, named", td_pack_count() == 27 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS")
+          && !strcmp(td_pack_name(15), "LIQUID") && !strcmp(td_pack_name(26), "POLYDUB"));
+    /* every pattern and pack: hats short (closed <= 18, open <= 36 with OPEN <= 30), no vocal sample (slot 1) */
+    int hats = 1, vox = 0;
+    td_init();
+    for (int p = 0; p < TD_PATTERNS; p++)
+        for (int t = 0; t < TD_TRACKS; t++) {
+            const int16_t *q = E.pat[p].param[t];
+            if (E.pat[p].machine[t] == TD_M_HAT) hats &= q[P_SRC + HH_OPEN] <= 30 && q[P_SRC + HH_DECAY] <= 36;
+            if (E.pat[p].machine[t] == TD_M_SAMPLE) vox |= q[P_SRC + SM_SLOT] == 1;
+        }
+    check("the hats are short and the vocal is gone from every pattern", hats && !vox);
     for (int k = 0; k < td_pack_count(); k++) {
         td_init();                                             /* P01: the house beat */
         td_step_t before = E.pat[0].step[0][0];

@@ -25,8 +25,8 @@ happens at the end of the pattern.
 | | Patterns |
 |---|---|
 | House | P01 DEEP 122 (4 bars over Am9, Dm9, Fmaj7, Em7: a syncopated bass, chord stabs, a pluck melody), P02 TECH 126 (a rolling sixteenth bass, toms and rims), P03 JACKIN 124 (claps with pickups, a heavy shuffle, electric piano), P04 AFRO 122 (a 3-3-2 tom pattern, a shaker, marimba plucks) |
-| Techno | P05 TECHNO 130 (the rolling off-beat sub, a 24-step stab, a 12-step tom), P06 ACID 132 (a 2-bar 303 line, the filter opening), P07 DUB 122 (polymetric, after DUB-1), P08 MELODIC 124 (an arpeggio over Am7, Fmaj7, Cmaj7, Gsus4, a pad) |
-| Garage | P09 2-STEP 132 (the skipping kick, ghost snares, a sliding sub, organ stabs), P10 SPEED 132 (four on the floor, the wheezy reese bass), P11 4X4 132 (an organ bass jumping octaves, electric-piano chords), P12 BASSLINE 138 (a wobbling bass) |
+| Techno | P05 TECHNO 130 (the rolling off-beat sub, a 24-step stab, a 12-step tom), P06 ACID 132 (P05's drums under a 303-style line, accents and slides, a slow filter sweep), P07 DUB 122 (deep and simple: a minor 9 stab into a long delay, a ducked sub, crackle), P08 MELODIC 124 (an arpeggio over Am7, Fmaj7, Cmaj7, Gsus4, a pad) |
+| Garage | P09 2-STEP 132 (the skipping kick, ghost snares, a sliding sub, organ stabs), P10 SPEED 132 (four on the floor, the wheezy reese bass), P11 4X4 132 (an organ bass jumping octaves, electric-piano chords), P12 BASSLINE 138 (a bouncing root-and-octave riff over Am and Dm, a gentle wobble, organ stabs) |
 | Drum & bass | P13 LIQUID 174 (the two-step, a long sub, electric-piano chords, a pad), P14 NEURO 174 (a reese in a sixteenth rhythm, metallic stabs), P15 JUNGLE 165 (a chopped break, a ride, a deep sub), P16 ROLLER 172 (rolling hats and sub, a tom groove) |
 
 Hold the left BEAT SYNC (FILL) for the fills (kicks and a clap roll on the four-on-the-floor patterns).
@@ -45,10 +45,10 @@ kit the load replaced (again: back to the pack).
 | Pack | The kit |
 |---|---|
 | 808 | a long sine kick, metallic hats, a two-tone snare, a gliding sub bass, a major 7 chord, a tom, a cowbell |
-| 909 | a punchy kick with click and drive, bright hats, a clap, a saw bass, a minor 7 stab, a snappy snare, the vocal |
+| 909 | a punchy kick with click and drive, bright hats, a clap, a saw bass, a minor 7 stab, a snappy snare, a chord-stab sample |
 | KEYS | a soft kit, a round bass, an FM electric piano and its chords, a slow pad |
 | DEEP ... ROLLER | the kits of the sixteen patterns |
-| MINIMAL, FILTER, HARD, PROG, DISCO, BREAKS, ELECTRO | more kits: minimal, French filter house, hard techno, progressive, disco, breaks, electro |
+| MINIMAL, FILTER, HARD, PROG, DISCO, BREAKS, ELECTRO, POLYDUB | more kits: minimal, French filter house, hard techno, progressive, disco, breaks, electro, the polymetric dub techno (after DUB-1) |
 
 ## How to read the controller
 

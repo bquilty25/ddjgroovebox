@@ -292,44 +292,44 @@ static void pat_house(void)
 }
 
 /* P04: acid. The four-on-the-floor beat under a 303-style line: square-ish, resonant, accents and slides */
+static void pat_techno(void);
+
+/* P06: acid. P05's techno drums under a 303-style line: a saw through a resonant filter with a short, snappy
+ * envelope, accents opening it further, slides between notes, in A minor pentatonic; a slow LFO sweeps the cutoff
+ * over the bars (rather than per-step locks) */
 static void pat_acid(void)
 {
-    four_on_the_floor();
+    pat_techno();
+    memset(P->step[4], 0, sizeof P->step[4]);                  /* (the rumble gives way to the line) */
+    memset(P->lock[4], 0, sizeof P->lock[4]);
+    memset(P->step[5], 0, sizeof P->step[5]);                  /* (and the stab: one hit every other bar) */
+    P->nscene[0] = P->nscene[1] = 0;
+    P->length[4] = 16;
 
-    prm(4, SRC(SY_SHAPE), 104); prm(4, SRC(SY_DETUNE), 0); prm(4, SRC(SY_SUB), 0); prm(4, SRC(SY_GLIDE), 26);
-    prm(4, P_CUT, 36); prm(4, P_RES, 104); prm(4, P_FENV, 44); prm(4, P_FDEC, 38); prm(4, P_KEY, 40); prm(4, P_FDRV, 40);
-    prm(4, P_AATK, 0); prm(4, P_ADEC, 50); prm(4, P_ASUS, 40); prm(4, P_AREL, 10);
-    prm(4, P_LEVEL, 98); prm(4, P_ODRV, 46); prm(4, P_DLY, 30); prm(4, P_DUCK, 40); prm(4, P_LEN, 3);
-    prm(4, P_LSPD, 6); prm(4, P_LMUL, 2); prm(4, P_LWAVE, 0); prm(4, P_LDEST, 9); prm(4, P_LDEPTH, 18);   /* CUTOFF */
+    prm(4, SRC(SY_SHAPE), 85); prm(4, SRC(SY_DETUNE), 0); prm(4, SRC(SY_SUB), 0); prm(4, SRC(SY_GLIDE), 22);
+    prm(4, P_CUT, 34); prm(4, P_RES, 96); prm(4, P_FENV, 56); prm(4, P_FDEC, 22); prm(4, P_KEY, 48); prm(4, P_FDRV, 30);
+    prm(4, P_AATK, 0); prm(4, P_ADEC, 40); prm(4, P_ASUS, 50); prm(4, P_AREL, 8);
+    prm(4, P_LEVEL, 96); prm(4, P_ODRV, 34); prm(4, P_DLY, 24); prm(4, P_DUCK, 40); prm(4, P_LEN, 3);
+    prm(4, P_LSPD, 3); prm(4, P_LMUL, 0); prm(4, P_LWAVE, 1); prm(4, P_LDEST, 9); prm(4, P_LDEPTH, 22);   /* the sweep */
     {
-        /* note, accent, slide; 0 = rest */
+        /* note (0 = rest), accent, slide: the root, its octave, the minor third, fifth and seventh */
         static const uint8_t line[16][3] = {
-            {33, 0, 0}, {45, 1, 0}, {0, 0, 0}, {33, 0, 0}, {36, 0, 1}, {38, 0, 0}, {33, 0, 0}, {0, 0, 0},
-            {45, 1, 0}, {31, 0, 0}, {33, 0, 1}, {36, 0, 0}, {40, 1, 0}, {0, 0, 0}, {33, 0, 0}, {43, 0, 1},
+            {33, 1, 0}, {33, 0, 0}, {45, 0, 1}, {33, 0, 0}, {0, 0, 0}, {36, 1, 0}, {33, 0, 1}, {45, 0, 0},
+            {33, 1, 0}, {0, 0, 0}, {40, 0, 1}, {38, 0, 0}, {33, 1, 0}, {31, 0, 0}, {45, 0, 1}, {36, 0, 0},
         };
-        /* the second bar answers: up to the C and the E, an octave jump, back down by slides */
-        static const uint8_t answer[16][3] = {
-            {33, 0, 0}, {33, 0, 1}, {36, 1, 0}, {0, 0, 0}, {40, 0, 1}, {45, 1, 0}, {43, 0, 0}, {40, 0, 1},
-            {0, 0, 0}, {48, 1, 0}, {45, 0, 1}, {43, 0, 0}, {40, 1, 0}, {38, 0, 1}, {36, 0, 0}, {31, 0, 1},
-        };
-        P->length[4] = 32;
-        for (int s = 0; s < 32; s++) {
-            const uint8_t *n = s < 16 ? line[s] : answer[s - 16];
-            if (!n[0]) continue;
-            td_step_t *st = trig(4, s, n[0], n[1] ? 120 : 92);
-            st->accent = n[1];
-            st->slide = n[2];
-            lock(4, s, P_CUT, 30 + s);                         /* the filter opens over the two bars */
+        for (int s = 0; s < 16; s++) {
+            if (!line[s][0]) continue;
+            td_step_t *st = trig(4, s, line[s][0], line[s][1] ? 122 : 90);
+            st->accent = line[s][1];
+            st->slide = line[s][2];
         }
+        P->step[4][13].cond = TD_COND_AB + 0;                  /* (variations: every other bar) */
+        P->step[4][7].cond = TD_COND_P1 + 5;
     }
-    /* 8 SAMPLE: the riser, every eighth bar */
-    prm(7, SRC(SM_SLOT), 3);
-    prm(7, P_LEVEL, 80); prm(7, P_REV, 40);
-    trig(7, 0, 60, 100)->cond = TD_COND_AB + 9;                /* 1:8 */
+    trig(5, 0, 57, 80)->cond = TD_COND_AB + 1;                 /* the stab, 2:2 */
 
-    scene(0, 4, P_CUT, 18); scene(0, 4, P_RES, 80); scene(0, 2, P_REV, 100);
-    scene(1, 4, P_CUT, 90); scene(1, 4, P_RES, 122); scene(1, 4, P_ODRV, 100); scene(1, 4, P_DLY, 90);
-    scene(1, 0, SRC(KK_DRIVE), 80);
+    scene(0, 4, P_CUT, 20); scene(0, 4, P_LDEPTH, 0); scene(0, 0, P_LOWCUT, 60);
+    scene(1, 4, P_CUT, 70); scene(1, 4, P_RES, 116); scene(1, 4, P_ODRV, 80); scene(1, 4, P_DLY, 80);
 }
 
 /* P02: techno. A harder kick, the open hat as a ride, sixteenth hats; a rolling sub on the off-sixteenths (the
@@ -697,6 +697,39 @@ static void pat_prog(void)
     scene(1, 5, SRC(FM_INDEX), 80); scene(1, 6, P_CUT, 90);
 }
 
+/* P07: dub techno, deep and simple. A soft round kick, a quiet clap on 4 (half the time), soft off-beat hats and a
+ * shaker; a filtered minor 9 stab on the "and" of 1 and 3 into a long dotted delay, its filter breathing; a sub on
+ * the off-beats, ducked; vinyl crackle underneath */
+static void pat_dubdeep(void)
+{
+    four_on_the_floor();
+    prm(0, SRC(KK_DECAY), 72); prm(0, SRC(KK_CLICK), 18); prm(0, SRC(KK_DRIVE), 10); prm(0, SRC(KK_TONE), 50);
+    prm(0, SRC(KK_SWEEP), 22); prm(0, P_LEVEL, 108);
+    P->step[0][14].trig = P->step[0][15].trig = 0;            /* (no kick fill: it stays steady) */
+    /* 2 HAT: soft off-beats; 3 CLAP: beat 4, 50 %, in reverb; 4 HAT: a shaker, sixteenths, quiet */
+    prm(1, SRC(HH_COLOR), 40); prm(1, SRC(HH_BRIGHT), 60); prm(1, P_LEVEL, 74); prm(1, P_DLY, 30); prm(1, P_REV, 30);
+    memset(P->step[2], 0, sizeof P->step[2]);
+    prm(2, SRC(CP_ROOM), 80); prm(2, P_REV, 100); prm(2, P_LEVEL, 70);
+    trig(2, 12, 60, 90)->cond = TD_COND_P1 + 3;
+    prm(3, SRC(HH_COLOR), 110); prm(3, SRC(HH_BRIGHT), 50); prm(3, P_LEVEL, 60);
+    /* 5 SYNTH: the sub, off-beats */
+    synth_sub(4); prm(4, SRC(SY_SHAPE), 0); prm(4, P_DUCK, 100);
+    trig(4, 2, 33, 96); trig(4, 6, 33, 80); trig(4, 10, 33, 96); trig(4, 14, 31, 78);
+    /* 6 SYNTH: the dub stab: minor 9, short, filtered low, into a long dotted delay; an LFO breathes its filter */
+    prm(5, SRC(SY_SHAPE), 80); prm(5, SRC(SY_DETUNE), 20); prm(5, SRC(SY_CHORD), 3);
+    prm(5, P_CUT, 44); prm(5, P_RES, 40); prm(5, P_FENV, 20); prm(5, P_FDEC, 30); prm(5, P_ADEC, 22); prm(5, P_ASUS, 0);
+    prm(5, P_AREL, 20); prm(5, P_LEVEL, 96); prm(5, P_DLY, 110); prm(5, P_REV, 60); prm(5, P_DUCK, 60); prm(5, P_LEN, 2);
+    prm(5, P_LSPD, 4); prm(5, P_LMUL, 1); prm(5, P_LWAVE, 0); prm(5, P_LDEST, 9); prm(5, P_LDEPTH, 26);
+    trig(5, 2, 57, 100); trig(5, 10, 57, 86);
+    trig(5, 13, 57, 64)->cond = TD_COND_AB + 5;               /* 1:4 */
+    /* 7 FM: off; 8 SAMPLE: the crackle, looped, quiet */
+    prm(7, SRC(SM_SLOT), 4); prm(7, SRC(SM_LOOP), 1); prm(7, P_LEVEL, 46); prm(7, P_LOWCUT, 70);
+    prm(7, P_AATK, 0); prm(7, P_ASUS, 127); prm(7, P_LEN, 16);
+    trig(7, 0, 60, 100);
+    scene(0, 5, P_CUT, 26); scene(0, 0, P_LEVEL, 60); scene(0, 5, P_REV, 120);
+    scene(1, 5, P_CUT, 80); scene(1, 5, P_DLY, 127); scene(1, 5, P_RES, 80);
+}
+
 /* ---- garage and drum & bass (with their own tempos) */
 
 static void fm_ep(int t, int chord)                            /* an FM electric piano (ratio 1, the tine's index dying) */
@@ -768,23 +801,36 @@ static void pat_4x4(void)
     scene(1, 5, SRC(FM_INDEX), 80); scene(1, 4, P_CUT, 100);
 }
 
-/* P12: bassline. Four on the floor, fast; a wobbling bass jumping octaves with slides, organ stabs */
+/* P12: bassline. Four on the floor, a clap on 2 and 4, shuffled hats; the bass: a bouncing riff between the root and
+ * its octave, a slide into each bar, over 2 bars (A minor, D minor), a plucked filter with a slow, gentle wobble;
+ * short organ stabs on the off-beats */
 static void pat_bassline(void)
 {
     four_on_the_floor();
     memset(P->step[3], 0, sizeof P->step[3]);
     shuffle_hats(3, 6);
-    prm(4, SRC(SY_SHAPE), 100); prm(4, SRC(SY_DETUNE), 30); prm(4, SRC(SY_SUB), 70); prm(4, SRC(SY_GLIDE), 30);
-    prm(4, P_CUT, 44); prm(4, P_RES, 60); prm(4, P_ADEC, 60); prm(4, P_ASUS, 60); prm(4, P_ODRV, 60); prm(4, P_LEVEL, 98);
-    prm(4, P_DUCK, 70); prm(4, P_LSPD, 64); prm(4, P_LMUL, 3); prm(4, P_LWAVE, 1); prm(4, P_LDEST, 9); prm(4, P_LDEPTH, 40);
-    static const int bl[][3] = {{1, 33, 0}, {3, 45, 1}, {5, 33, 0}, {7, 40, 1}, {9, 33, 0}, {11, 45, 1}, {13, 43, 0}, {15, 40, 1}};
-    for (int i = 0; i < 8; i++) trig(4, bl[i][0], bl[i][1], 104)->slide = (uint8_t)bl[i][2];
-    organ(5); prm(5, SRC(SY_CHORD), 1);
-    trig(5, 2, 57, 90); trig(5, 10, 57, 84);
-    prm(7, SRC(SM_SLOT), 1); prm(7, P_LEVEL, 88); prm(7, P_DLY, 60);
-    trig(7, 6, 60, 100)->cond = TD_COND_AB + 5;
-    scene(0, 4, P_CUT, 24); scene(0, 4, P_LDEPTH, 0);
-    scene(1, 4, P_CUT, 80); scene(1, 4, P_LDEPTH, 63);
+    prm(0, SRC(KK_DECAY), 52); prm(0, SRC(KK_CLICK), 60); prm(0, SRC(KK_DRIVE), 30);
+    prm(4, SRC(SY_SHAPE), 86); prm(4, SRC(SY_DETUNE), 16); prm(4, SRC(SY_SUB), 64); prm(4, SRC(SY_GLIDE), 24);
+    prm(4, P_CUT, 58); prm(4, P_RES, 24); prm(4, P_FENV, 34); prm(4, P_FDEC, 28); prm(4, P_KEY, 40);
+    prm(4, P_ADEC, 40); prm(4, P_ASUS, 30); prm(4, P_AREL, 10); prm(4, P_ODRV, 24); prm(4, P_LEVEL, 100);
+    prm(4, P_DUCK, 60); prm(4, P_LEN, 3);
+    prm(4, P_LSPD, 32); prm(4, P_LMUL, 2); prm(4, P_LWAVE, 0); prm(4, P_LDEST, 9); prm(4, P_LDEPTH, 12);   /* (gentle) */
+    P->length[4] = 32;
+    /* per bar: root on the off-beat, the octave answering, the fifth, a step down sliding into the next bar */
+    static const int riff[][3] = {{2, 0, 104}, {3, 12, 70}, {6, 0, 100}, {7, 12, 72}, {9, 0, 84}, {10, 7, 96},
+                                  {11, 12, 70}, {14, 0, 100}, {15, -2, 80}};
+    static const int roots[2] = {33, 38};                     /* A1, D2 */
+    for (int b = 0; b < 2; b++)
+        for (int i = 0; i < 9; i++) {
+            td_step_t *st = trig(4, b * 16 + riff[i][0], roots[b] + riff[i][1], riff[i][2]);
+            if (i == 8) st->slide = 1;
+            if (riff[i][1] == 12) st->cond = i == 1 ? 0 : TD_COND_P1 + 5;   /* (some octaves 75 %) */
+        }
+    organ(5); prm(5, SRC(SY_CHORD), 1); prm(5, P_ADEC, 18); prm(5, P_ASUS, 0); prm(5, P_LEVEL, 80);
+    P->length[5] = 32;
+    trig(5, 2, 57, 88); trig(5, 10, 57, 76); trig(5, 18, 62, 88); trig(5, 26, 62, 76);
+    scene(0, 4, P_CUT, 30); scene(0, 0, P_LOWCUT, 60);
+    scene(1, 4, P_CUT, 84); scene(1, 4, P_LDEPTH, 30); scene(1, 4, P_ODRV, 60);
 }
 
 /* the drum & bass two-step: the kick on 1 and the "and" of 3, the snare on 2 and 4, ghosts, over 2 bars */
@@ -939,11 +985,33 @@ static void pat_electro(void)
     scene(1, 4, P_CUT, 90); scene(1, 4, P_RES, 90); scene(1, 6, SRC(FM_INDEX), 127); scene(1, 0, SRC(KK_DRIVE), 70);
 }
 
+/* After every pattern and pack: hats short (a closed hat at most ~40 ms, an open one ~0.3 s: OPEN multiplies the
+ * decay up to 16 times), and no vocal (slot 1): the chord stab (slot 2, C minor 7) tuned down to A minor 7 instead. */
+static void polish(td_pattern_t *p)
+{
+    for (int t = 0; t < TD_TRACKS; t++) {
+        int16_t *q = p->param[t];
+        if (p->machine[t] == TD_M_HAT) {
+            int open = q[P_SRC + HH_OPEN] > 10;
+            if (q[P_SRC + HH_OPEN] > 30) q[P_SRC + HH_OPEN] = 30;
+            int cap = open ? 36 : 18;
+            if (q[P_SRC + HH_DECAY] > cap) q[P_SRC + HH_DECAY] = (int16_t)cap;
+        }
+        if (p->machine[t] == TD_M_SAMPLE && q[P_SRC + SM_SLOT] == 1) {
+            q[P_SRC + SM_SLOT] = 2;
+            q[P_SRC + SM_TUNE] = -3;
+            if (q[P_LEVEL] > 80) q[P_LEVEL] = 80;
+            if (q[P_LOWCUT] < 50) q[P_LOWCUT] = 50;
+        }
+    }
+}
+
 static void build(int p, void (*fill)(void))
 {
     P = &E.pat[p];
     td_pattern_init_kit(P);
     fill();
+    polish(P);
 }
 
 void td_default_project(void)
@@ -951,7 +1019,7 @@ void td_default_project(void)
     /* four of each, each at its tempo: house (left deck pads 1-4), techno (5-8), garage (right 1-4), drum & bass (5-8) */
     static const struct { void (*fill)(void); int bpm; } SET[TD_PATTERNS] = {
         {pat_house, 122}, {pat_tech, 126}, {pat_jackin, 124}, {pat_afro, 122},
-        {pat_techno, 130}, {pat_acid, 132}, {pat_dub, 122}, {pat_melodic, 124},
+        {pat_techno, 130}, {pat_acid, 132}, {pat_dubdeep, 122}, {pat_melodic, 124},
         {pat_garage, 132}, {pat_speed, 132}, {pat_4x4, 132}, {pat_bassline, 138},
         {pat_liquid, 174}, {pat_neuro, 174}, {pat_jungle, 165}, {pat_roller, 172},
     };
@@ -1085,11 +1153,11 @@ static void kit_keys(void)
 static const struct { const char *name; void (*fill)(void); } PACKS[] = {
     {"808", kit_808}, {"909", kit_909}, {"KEYS", kit_keys},
     {"DEEP", pat_house}, {"TECH", pat_tech}, {"JACKIN", pat_jackin}, {"AFRO", pat_afro},
-    {"TECHNO", pat_techno}, {"ACID", pat_acid}, {"DUB", pat_dub}, {"MELODIC", pat_melodic},
+    {"TECHNO", pat_techno}, {"ACID", pat_acid}, {"DUB", pat_dubdeep}, {"MELODIC", pat_melodic},
     {"2-STEP", pat_garage}, {"SPEED", pat_speed}, {"4X4", pat_4x4}, {"BASSLINE", pat_bassline},
     {"LIQUID", pat_liquid}, {"NEURO", pat_neuro}, {"JUNGLE", pat_jungle}, {"ROLLER", pat_roller},
     {"MINIMAL", pat_minimal}, {"FILTER", pat_filter}, {"HARD", pat_hard}, {"PROG", pat_prog},
-    {"DISCO", pat_disco}, {"BREAKS", pat_breaks}, {"ELECTRO", pat_electro},
+    {"DISCO", pat_disco}, {"BREAKS", pat_breaks}, {"ELECTRO", pat_electro}, {"POLYDUB", pat_dub},
 };
 #define NPACKS ((int)(sizeof PACKS / sizeof PACKS[0]))
 
@@ -1134,6 +1202,7 @@ void td_pack_load(int pack)
     P = &g_scratch;                                            /* (built aside, outside the lock) */
     td_pattern_init_kit(P);
     PACKS[pack].fill();
+    polish(P);
     kit_get(P, &k);
     td_lock();
     if (E.inited) {

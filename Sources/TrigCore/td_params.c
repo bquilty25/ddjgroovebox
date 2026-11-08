@@ -363,7 +363,8 @@ const char *td_cond_name(int cond) { return cond >= 0 && cond < TD_CONDS ? COND_
 const char *td_perf_name(int perf)
 {
     static const char *const N[TD_PERFS] = {"REPEAT", "STUTTER", "TAPESTOP", "DLYTHROW", "REVTHROW", "FILTER", "CRUSH",
-                                            "DUBHOLD"};
+                                            "DUBHOLD", "ECHO", "FLANGER", "PHASER", "TRANS", "AUTOPAN", "REVERSE",
+                                            "HALF", "NOISE", "DISTORT", "SWEEP"};
     return perf >= 0 && perf < TD_PERFS ? N[perf] : "";
 }
 const char *td_scale_name(int scale) { return scale >= 0 && scale < 8 ? SCALE_NAMES[scale] : ""; }

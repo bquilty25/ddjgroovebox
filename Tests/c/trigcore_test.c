@@ -428,6 +428,28 @@ TEST(test_perf)
         snprintf(msg, sizeof msg, "%-9s on / off without a click: edges %.4f (live %.4f, during %.4f)", td_perf_name(p), edge, live, during);
         check(msg, finite && pk <= 1.f && edge <= 1.5f * fmaxf(live, during) + 0.01f);
     }
+    /* every insert changes the sound: the same 0.5 s with and without it differ (rms of the difference) */
+    {
+        static float ref[2 * 24000], fx[2 * 24000];
+        sine_source();
+        td_trigger(1, 60, 127);
+        td_render(ref, 24000, 0);
+        int all = 1;
+        char bad[200] = "";
+        for (int p = TD_PERF_ECHO; p < TD_PERFS; p++) {
+            sine_source();
+            td_trigger(1, 60, 127);
+            td_perf(p, 2, TD_TARGET_MASTER, 1, 0.8f);
+            td_render(fx, 24000, 0);
+            double d = 0;
+            for (int i = 2 * 4800; i < 2 * 24000; i++) d += (double)(fx[i] - ref[i]) * (fx[i] - ref[i]);
+            double rms = sqrt(d / (2.0 * 19200));
+            if (!(rms > 0.003)) { all = 0; snprintf(bad + strlen(bad), sizeof bad - strlen(bad), " %s %.4f", td_perf_name(p), rms); }
+        }
+        char msg[260];
+        snprintf(msg, sizeof msg, "ECHO .. SWEEP each change the sound%s", bad);
+        check(msg, all);
+    }
     td_state_t st;
     sine_source();
     td_perf(TD_PERF_REPEAT, 1, TD_TARGET_DECK_A, 1, 1.f);

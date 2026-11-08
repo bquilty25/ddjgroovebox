@@ -41,6 +41,17 @@ typedef enum {                      /* performance effects (beat FX section) */
     TD_PERF_REPEAT, TD_PERF_STUTTER, TD_PERF_TAPESTOP, TD_PERF_DELAYTHROW, TD_PERF_REVERBTHROW, TD_PERF_FILTER,
     TD_PERF_CRUSH,
     TD_PERF_DUBHOLD,               /* (added) freezes the master tape delay into a clean loop; target ignored */
+    /* (added, after Mixxx's effects) inserts like REPEAT .. CRUSH, in time with the division; amount = depth */
+    TD_PERF_ECHO,                  /* a ping-pong echo of the division; amount: feedback */
+    TD_PERF_FLANGER,               /* one sweep a division; amount: feedback */
+    TD_PERF_PHASER,                /* one sweep a division; amount: depth */
+    TD_PERF_TRANS,                 /* the live sound gated on and off at the division; amount: how short */
+    TD_PERF_AUTOPAN,               /* left, right, once a division; amount: width */
+    TD_PERF_REVERSE,               /* the division captured, then played backwards, looping */
+    TD_PERF_HALF,                  /* the division captured, played at half speed (an octave down), looping */
+    TD_PERF_NOISE,                 /* white noise rising over the sound; amount: level and brightness */
+    TD_PERF_DISTORT,               /* drive; amount: how much */
+    TD_PERF_SWEEP,                 /* a resonant low-pass sweeping once a division; amount: resonance */
     TD_PERFS
 } td_perf_t;
 typedef enum { TD_TARGET_DECK_A, TD_TARGET_DECK_B, TD_TARGET_MASTER } td_target_t;

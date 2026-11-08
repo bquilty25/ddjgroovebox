@@ -325,6 +325,10 @@ typedef struct {                                               /* the performanc
     float hold[2], ph, gate;
     float fg, fk, cq, cinc;                                    /* per segment: filter g, k; crush step, hold rate */
     int fhp;
+    float ap[2][4], apa, apfb[2];                              /* PHASER: allpass states, coefficient, feedback */
+    float lfo;                                                 /* per segment: 0..1 through the division */
+    uint32_t rng;                                              /* NOISE */
+    float drive;                                               /* DISTORT */
     /* the next request */
     int r_on, r_type, r_target, r_div;
     float r_amount;

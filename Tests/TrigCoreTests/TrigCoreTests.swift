@@ -2,6 +2,7 @@
 // TRIGDECK engine tests through its C API, as the app uses it. The deeper engine tests (timing to the frame across
 // tempos, every machine at every parameter's extremes, scratch, performance FX, DUB HOLD, AUTOPILOT, CPU, threads under
 // ThreadSanitizer) are C programs in Tests/c (trigcore_test.c, trigcore_tsan.c).
+import DDJMapping
 import TrigCore
 import XCTest
 
@@ -45,7 +46,11 @@ final class TrigCoreTests: XCTestCase {
         XCTAssertEqual(TD_TRACKS, 8)
         XCTAssertEqual(TD_SLOTS, 8)
         XCTAssertEqual(nparams, 48)
-        XCTAssertEqual(Int32(TD_PERFS.rawValue), 8)
+        XCTAssertEqual(Int32(TD_PERFS.rawValue), 18)
+        XCTAssertEqual(PerfFX.allCases.count, Int(TD_PERFS.rawValue), "the Swift list and the engine's agree")
+        for p in PerfFX.allCases {                                // (the same order: the engine's names, unspaced)
+            XCTAssertEqual(String(cString: td_perf_name(Int32(p.rawValue))), p.name.replacingOccurrences(of: " ", with: ""))
+        }
         XCTAssertEqual(td_cond_ab.0.0, 1)
         XCTAssertEqual(td_cond_ab.0.1, 2)
     }

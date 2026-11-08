@@ -38,6 +38,6 @@ let package = Package(
         ),
         .testTarget(name: "DDJMappingTests", dependencies: ["DDJMapping"], path: "Tests/DDJMappingTests"),
         .testTarget(name: "SloopCoreTests", dependencies: ["SloopCore", "DDJMapping"], path: "Tests/SloopCoreTests"),
-        .testTarget(name: "TrigCoreTests", dependencies: ["TrigCore"], path: "Tests/TrigCoreTests"),
+        .testTarget(name: "TrigCoreTests", dependencies: ["TrigCore", "DDJMapping"], path: "Tests/TrigCoreTests"),
     ]
 )

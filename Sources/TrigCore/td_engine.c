@@ -58,7 +58,17 @@ static inline void fpcr_set(uint64_t v) { __asm__ volatile("msr fpcr, %0" : : "r
 
 /* ---- the performance insert */
 #define XF 96u                                                 /* REPEAT loop crossfade (2 ms) */
-static int is_insert(int t) { return t == TD_PERF_REPEAT || t == TD_PERF_STUTTER || t == TD_PERF_TAPESTOP || t == TD_PERF_FILTER || t == TD_PERF_CRUSH; }
+#define FL_RING 2048u                                          /* FLANGER's delay line (in g_perf), frames */
+static int is_insert(int t)
+{
+    return t == TD_PERF_REPEAT || t == TD_PERF_STUTTER || t == TD_PERF_TAPESTOP || t == TD_PERF_FILTER || t == TD_PERF_CRUSH
+        || (t >= TD_PERF_ECHO && t <= TD_PERF_SWEEP);
+}
+/* the effects that replace the live sound with captured audio (the deck's slip / scratch defer to them) */
+static int is_capture(int t)
+{
+    return t == TD_PERF_REPEAT || t == TD_PERF_STUTTER || t == TD_PERF_TAPESTOP || t == TD_PERF_REVERSE || t == TD_PERF_HALF;
+}
 static void ins_update(int n)
 {
     td_insert_t *u = &E.ins;
@@ -86,11 +96,29 @@ static void ins_update(int n)
         u->ph = 1.f;
         u->hold[0] = u->hold[1] = 0.f;
         memset(u->f, 0, sizeof u->f);
+        memset(u->ap, 0, sizeof u->ap);
+        u->apfb[0] = u->apfb[1] = 0.f;
+        u->rng = 0x9E3779B9u;
+        if (u->type == TD_PERF_ECHO) memset(g_perf, 0, (size_t)u->len * 2u * sizeof(float));   /* (the echo's line) */
+        if (u->type == TD_PERF_FLANGER) memset(g_perf, 0, FL_RING * 2u * sizeof(float));
     }
     if (!u->active)
         return;
     u->amount_s += (u->amount - u->amount_s) * fminf(1.f, (float)n * 0.003f);
-    if (u->type == TD_PERF_FILTER) {
+    u->lfo = (float)(u->t % u->len) / (float)u->len;
+    float sweep = 0.5f - 0.5f * cosf(6.2831853f * u->lfo);    /* 0 .. 1 .. 0 once a division */
+    if (u->type == TD_PERF_PHASER) {
+        float tn = tanf(3.14159265f * 180.f * exp2f(5.f * sweep) / TD_SR);
+        u->apa = (tn - 1.f) / (tn + 1.f);
+    } else if (u->type == TD_PERF_SWEEP) {
+        u->fg = svf_g(120.f * exp2f(6.5f * sweep));
+        u->fk = 1.f / (0.7f + u->amount_s * 7.f);
+    } else if (u->type == TD_PERF_NOISE) {
+        u->fg = svf_g(250.f * exp2f(u->amount_s * 5.5f));
+        u->fk = 1.2f;
+    } else if (u->type == TD_PERF_DISTORT) {
+        u->drive = 1.f + u->amount_s * u->amount_s * 40.f;
+    } else if (u->type == TD_PERF_FILTER) {
         float a2 = (u->amount_s - 0.5f) * 2.f;
         u->fhp = a2 > 0.f;
         float fc = a2 < 0.f ? 20000.f * exp2f(a2 * 7.6f) : 20.f * exp2f(a2 * 8.6f);
@@ -174,6 +202,131 @@ static void ins_tick(float *pl, float *pr)
         wl = u->hold[0];
         wr = u->hold[1];
         break;
+    case TD_PERF_ECHO: {                                       /* ping-pong: left feeds right feeds left */
+        uint32_t i = u->t % u->len;
+        float yl = g_perf[i * 2u], yr = g_perf[i * 2u + 1u];
+        float fb = 0.35f + 0.5f * u->amount_s;
+        g_perf[i * 2u] = 0.5f * (l + r) * 0.8f + yr * fb;
+        g_perf[i * 2u + 1u] = yl * fb;
+        wl = l + yl * 0.8f;
+        wr = r + yr * 0.8f;
+        u->t++;
+        break;
+    }
+    case TD_PERF_FLANGER: {
+        uint32_t w = u->t & (FL_RING - 1u);
+        float c = (float)(u->t % u->len) / (float)u->len;
+        float fb = 0.2f + 0.6f * u->amount_s;
+        float y[2];
+        for (int ch = 0; ch < 2; ch++) {                       /* (the right side a quarter of a sweep later) */
+            float s = 0.5f - 0.5f * cosf(6.2831853f * (c + 0.25f * (float)ch));
+            float d = 24.f + 216.f * s;                       /* 0.5 .. 5 ms */
+            float rp = (float)w - d + (float)FL_RING;
+            uint32_t i0 = (uint32_t)rp, i1 = i0 + 1u;
+            float f = rp - (float)i0;
+            y[ch] = perf_at(i0 & (FL_RING - 1u), ch) * (1.f - f) + perf_at(i1 & (FL_RING - 1u), ch) * f;
+        }
+        g_perf[w * 2u] = l + y[0] * fb;
+        g_perf[w * 2u + 1u] = r + y[1] * fb;
+        wl = 0.7f * (l + y[0]);
+        wr = 0.7f * (r + y[1]);
+        u->t++;
+        break;
+    }
+    case TD_PERF_PHASER: {                                     /* four first-order allpasses with feedback */
+        float in[2] = {l, r}, out[2];
+        float fb = 0.2f + 0.5f * u->amount_s;
+        for (int ch = 0; ch < 2; ch++) {
+            float x = in[ch] + u->apfb[ch] * fb;
+            for (int k = 0; k < 4; k++) {
+                float y = u->apa * x + u->ap[ch][k];
+                u->ap[ch][k] = x - u->apa * y;
+                x = y;
+            }
+            u->apfb[ch] = x;
+            out[ch] = 0.5f * (in[ch] + x * (0.5f + 0.5f * u->amount_s)) * 1.3f;
+        }
+        wl = out[0];
+        wr = out[1];
+        u->t++;
+        break;
+    }
+    case TD_PERF_TRANS: {                                      /* the live sound, gated in time */
+        float c = (float)(u->t % u->len) / (float)u->len;
+        float target = c < 1.f - 0.75f * u->amount_s ? 1.f : 0.f;
+        u->gate += target > u->gate ? 1.f / 72.f : -1.f / 72.f;
+        u->gate = clampf(u->gate, 0.f, 1.f);
+        wl = l * u->gate;
+        wr = r * u->gate;
+        u->t++;
+        break;
+    }
+    case TD_PERF_AUTOPAN: {
+        float p = sinf(6.2831853f * (float)(u->t % u->len) / (float)u->len) * u->amount_s;
+        wl = l * (1.f - fmaxf(0.f, p));
+        wr = r * (1.f - fmaxf(0.f, -p));
+        u->t++;
+        break;
+    }
+    case TD_PERF_REVERSE: {                                    /* the first pass is live (captured), then backwards */
+        if (u->rec < u->len) {
+            g_perf[u->rec * 2u] = l;
+            g_perf[u->rec * 2u + 1u] = r;
+            u->rec++;
+        } else {
+            uint32_t p = u->pos, idx = u->len - 1u - p;
+            /* (each pass starts on the newest sample, so the first is seamless; later wraps fade through zero) */
+            float e = fminf(1.f, (float)(u->len - p) / (float)XF);
+            if (u->dur > 0u) e = fminf(e, (float)p / (float)XF);
+            wl = perf_at(idx, 0) * e;
+            wr = perf_at(idx, 1) * e;
+            if (++u->pos >= u->len) { u->pos = 0; u->dur++; }
+        }
+        break;
+    }
+    case TD_PERF_HALF: {                                       /* read at half speed while capturing at full */
+        if (u->rec < u->len) {
+            g_perf[u->rec * 2u] = l;
+            g_perf[u->rec * 2u + 1u] = r;
+            u->rec++;
+        }
+        int ip = (int)u->tpos;
+        float f = (float)(u->tpos - ip);
+        uint32_t i0 = (uint32_t)ip, i1 = i0 + 1u < u->len ? i0 + 1u : i0;
+        float e = fminf(1.f, (float)((double)u->len - u->tpos) / (float)XF);
+        if (u->t > 0u) e = fminf(e, (float)u->tpos / (float)XF);    /* (t: the passes done) */
+        wl = (perf_at(i0, 0) * (1.f - f) + perf_at(i1, 0) * f) * e;
+        wr = (perf_at(i0, 1) * (1.f - f) + perf_at(i1, 1) * f) * e;
+        u->tpos += 0.5;
+        if (u->tpos >= (double)u->len) { u->tpos -= (double)u->len; u->t++; }
+        break;
+    }
+    case TD_PERF_NOISE: {                                      /* filtered white noise over the sound */
+        float lp, bp, hp, nl, nr;
+        svf_run(&u->f[0], td_rand01(&u->rng) * 2.f - 1.f, u->fg, u->fk, &lp, &bp, &hp);
+        nl = hp;
+        svf_run(&u->f[1], td_rand01(&u->rng) * 2.f - 1.f, u->fg, u->fk, &lp, &bp, &hp);
+        nr = hp;
+        float lv = 0.03f + 0.3f * u->amount_s * u->amount_s;
+        wl = l + nl * lv;
+        wr = r + nr * lv;
+        break;
+    }
+    case TD_PERF_DISTORT: {
+        float k = 1.f / tanhf(fminf(u->drive, 4.f));          /* (about the same loudness at any drive) */
+        wl = tanhf(l * u->drive) * k * 0.6f;
+        wr = tanhf(r * u->drive) * k * 0.6f;
+        break;
+    }
+    case TD_PERF_SWEEP: {
+        float lp, bp, hp;
+        svf_run(&u->f[0], l, u->fg, u->fk, &lp, &bp, &hp);
+        wl = lp;
+        svf_run(&u->f[1], r, u->fg, u->fk, &lp, &bp, &hp);
+        wr = lp;
+        u->t++;
+        break;
+    }
     default: break;
     }
     if (u->releasing) {
@@ -187,7 +340,7 @@ static void ins_tick(float *pl, float *pr)
 static float ins_takeover(void)                                /* how much the insert replaces the live sound */
 {
     const td_insert_t *u = &E.ins;
-    if (!u->active || u->type == TD_PERF_FILTER || u->type == TD_PERF_CRUSH) return 0.f;
+    if (!u->active || !is_capture(u->type)) return 0.f;
     return u->mix;
 }
 

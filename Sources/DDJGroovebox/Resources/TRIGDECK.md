@@ -70,7 +70,7 @@ bass and the stab.
 | Channel faders, TRIM | deck A / deck B level and drive |
 | Crossfader | scene A ← pattern → scene B |
 | Headphone CUE (held) | edit scene A / B: turn knobs while held; SHIFT + CUE clears the scene |
-| BEAT FX | FX SELECT: the effect (REPEAT, STUTTER, TAPE STOP, DELAY THROW, REVERB THROW, FILTER, CRUSH, DUB HOLD); BEAT ◀ ▶: its division; the channel switch: deck A, deck B or master; LEVEL/DEPTH: amount; ON/OFF: press to switch it on, press again to switch it off |
+| BEAT FX | FX SELECT: the next effect, SHIFT + FX SELECT the previous (REPEAT, STUTTER, TAPE STOP, DELAY THROW, REVERB THROW, FILTER, CRUSH, DUB HOLD, ECHO, FLANGER, PHASER, TRANS, AUTOPAN, REVERSE, HALF, NOISE, DISTORT, SWEEP; the timed ones follow the division, LEVEL/DEPTH sets feedback, depth or drive); BEAT ◀ ▶: its division; the channel switch: deck A, deck B or master; LEVEL/DEPTH: amount; ON/OFF: press to switch it on, press again to switch it off |
 
 ## Without a DDJ-400
 

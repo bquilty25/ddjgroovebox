@@ -9,8 +9,10 @@ public enum TrigPage: Int, CaseIterable, Hashable, Sendable {
 
 public enum PerfFX: Int, CaseIterable, Hashable, Sendable {
     case repeat_ = 0, stutter, tapeStop, delayThrow, reverbThrow, filter, crush, dubHold
+    case echo, flanger, phaser, trans, autopan, reverse, half, noise, distort, sweep
     public var name: String {
-        ["REPEAT", "STUTTER", "TAPE STOP", "DLY THROW", "REV THROW", "FILTER", "CRUSH", "DUB HOLD"][rawValue]
+        ["REPEAT", "STUTTER", "TAPE STOP", "DLY THROW", "REV THROW", "FILTER", "CRUSH", "DUB HOLD",
+         "ECHO", "FLANGER", "PHASER", "TRANS", "AUTOPAN", "REVERSE", "HALF", "NOISE", "DISTORT", "SWEEP"][rawValue]
     }
 }
 

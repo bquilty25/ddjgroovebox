@@ -25,8 +25,10 @@ happens at the end of the pattern.
 | | Patterns |
 |---|---|
 | House | P01 DEEP 122 (4 bars over Am9, Dm9, Fmaj7, Em7: a syncopated bass, chord stabs, a pluck melody), P02 TECH 126 (a rolling sixteenth bass, toms and rims), P03 JACKIN 124 (claps with pickups, a heavy shuffle, electric piano), P04 AFRO 122 (a 3-3-2 tom pattern, a shaker, marimba plucks) |
-| Techno | P05 TECHNO 130 (the rolling off-beat sub, a 24-step stab, a 12-step tom), P06 ACID 132 (P05's drums under a 303-style line, accents and slides, a slow filter sweep), P07 DUB 122 (deep and simple: a minor 9 stab into a long delay, a ducked sub, crackle), P08 MELODIC 124 (an arpeggio over Am7, Fmaj7, Cmaj7, Gsus4, a pad) |
-| Garage | P09 2-STEP 132 (the skipping kick, ghost snares, a sliding sub, organ stabs), P10 SPEED 132 (four on the floor, the wheezy reese bass), P11 4X4 132 (an organ bass jumping octaves, electric-piano chords), P12 BASSLINE 138 (a bouncing root-and-octave riff over Am and Dm, a gentle wobble, organ stabs) |
+| Techno | P05 TECHNO 130 (the rolling off-beat sub, a 24-step stab, a 12-step tom), P06 MICRO 124 (microhouse: a clicky kick, tick hats, a rim, a bouncing bass, FM clicks on 7 steps against a 15-step shaker), P07 DUBSPACE 118 (dub techno, dubbed out: a muffled kick, a sine sub, a minor 9 chord almost all in the delay and reverb, an LFO breathing its filter, hiss), P08 MELODIC 124 (an arpeggio over Am7, Fmaj7, Cmaj7, Gsus4, a pad) |
+| Garage | P09 2-STEP 132 (the skipping kick, ghost snares, a sliding sub, organ stabs), P10 SPEED 132 (four on the floor, the wheezy reese bass), P11 4X4 132 (an organ bass jumping octaves, electric-piano chords), P12 HAZE 130 (folktronic, Four Tet-like: shuffled hats, a 3-against-4 tambourine, a plucked FM harp on 13 steps over Dm9, Bbmaj7, Fmaj7, Cadd9, a pumping pad, a reversed chord swell) |
+
+The old ACID, DUB and BASSLINE patterns are still there as sound packs (MASTER page, BROWSE), with the new MICRO, DUBSPACE and HAZE.
 | Drum & bass | P13 LIQUID 174 (the two-step, a long sub, electric-piano chords, a pad), P14 NEURO 174 (a reese in a sixteenth rhythm, metallic stabs), P15 JUNGLE 165 (a chopped break, a ride, a deep sub), P16 ROLLER 172 (rolling hats and sub, a tom groove) |
 
 Hold the left BEAT SYNC (FILL) for the fills (kicks and a clap roll on the four-on-the-floor patterns).

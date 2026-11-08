@@ -1057,6 +1057,136 @@ static void v_roller(void)
     prm(5, P_BITS, 70); prm(5, P_SRR, 50);
 }
 
+/* ---- three more (P06, P07, P12): microhouse, dub techno taken further, and a folktronic, Four Tet-like groove.
+ * The tracks keep the default machines unless a line says otherwise. */
+
+/* P06: microhouse. A tight, clicky kick, tick hats, a rim, a short bouncing bass, a tiny minor chord blip on 20
+ * steps, FM clicks on 7 steps (the polymeter keeps it shifting), the crackle underneath */
+static void pat_micro(void)
+{
+    prm(0, SRC(KK_DECAY), 44); prm(0, SRC(KK_CLICK), 112); prm(0, SRC(KK_TONE), 120); prm(0, SRC(KK_SWEEP), 14);
+    prm(0, SRC(KK_STIME), 10); prm(0, SRC(KK_DRIVE), 30); prm(0, P_LEVEL, 124);
+    for (int s = 0; s < 16; s += 4) trig(0, s, 60, 118);
+    trig(0, 7, 60, 64)->cond = TD_COND_P1 + 1;                 /* 25 % */
+    prm(1, SRC(HH_TUNE), 12); prm(1, SRC(HH_DECAY), 3); prm(1, SRC(HH_COLOR), 100); prm(1, SRC(HH_BRIGHT), 127);
+    prm(1, SRC(HH_RESO), 40); prm(1, P_LEVEL, 110); prm(1, P_PAN, 30); prm(1, P_LOWCUT, 100); prm(1, P_DLY, 24);
+    for (int s = 2; s < 16; s += 4) trig(1, s, 60, 96);
+    trig(1, 3, 60, 50)->micro = 4; trig(1, 9, 60, 46)->cond = TD_COND_P1 + 3; trig(1, 13, 60, 54)->micro = 4;
+    td_set_machine_x(P, 2, TD_M_SNARE);                        /* a rim: all snap, no body */
+    prm(2, SRC(SN_TUNE), 24); prm(2, SRC(SN_DECAY), 4); prm(2, SRC(SN_NOISE), 10); prm(2, SRC(SN_NDECAY), 6);
+    prm(2, SRC(SN_SNAP), 127); prm(2, SRC(SN_BODY), 10); prm(2, P_LEVEL, 82); prm(2, P_PAN, -24); prm(2, P_DLY, 40);
+    trig(2, 4, 60, 90); trig(2, 11, 60, 64)->cond = TD_COND_P1 + 2; trig(2, 12, 60, 96);
+    prm(3, SRC(HH_DECAY), 5); prm(3, SRC(HH_COLOR), 30); prm(3, SRC(HH_BRIGHT), 70); prm(3, P_LEVEL, 96);
+    prm(3, P_PAN, -30); prm(3, P_LOWCUT, 96);
+    P->length[3] = 15;                                         /* (a 15-step shaker drifts against the bar) */
+    for (int s = 0; s < 15; s++) trig(3, s, 60, s % 3 == 0 ? 84 : 40);
+    tone(4, 20, 0, 40, 0); filt(4, 0, 50, 24, 20, 10, 10); amp(4, 0, 14, 0, 8);
+    prm(4, P_LEVEL, 127); prm(4, P_DUCK, 60); prm(4, P_LEN, 4); prm(4, P_ADEC, 24);
+    trig(4, 3, 33, 104); trig(4, 6, 33, 70); trig(4, 10, 45, 72); trig(4, 11, 33, 96);
+    trig(4, 14, 40, 64)->cond = TD_COND_P1 + 3;
+    tone(5, 40, 8, 0, 0); filt(5, 0, 64, 30, 30, 10, 0); amp(5, 0, 10, 0, 12);
+    prm(5, SRC(SY_CHORD), 1); prm(5, P_LEVEL, 110); prm(5, P_DLY, 70); prm(5, P_REV, 30); prm(5, P_PAN, -20);
+    P->length[5] = 20;
+    trig(5, 7, 57, 90); trig(5, 15, 60, 70)->cond = TD_COND_AB + 0;
+    fm_voice(6, 15, 100, 20, 4, 127); amp(6, 0, 4, 0, 4);       /* clicks: a high ratio, a very short envelope */
+    prm(6, P_LEVEL, 100); prm(6, P_PAN, 40); prm(6, P_DLY, 40);
+    P->length[6] = 7;
+    trig(6, 0, 84, 80); trig(6, 3, 79, 60); trig(6, 5, 91, 70)->cond = TD_COND_P1 + 4;
+    prm(7, SRC(SM_SLOT), 4); prm(7, SRC(SM_LOOP), 1); prm(7, P_LEVEL, 34); prm(7, P_LOWCUT, 80);
+    prm(7, P_ASUS, 127); prm(7, P_LEN, 16);
+    trig(7, 0, 60, 100);
+    scene(0, 0, P_LOWCUT, 70); scene(0, 5, P_REV, 110); scene(0, 4, P_CUT, 30);
+    scene(1, 6, SRC(FM_INDEX), 127); scene(1, 1, SRC(HH_DECAY), 12); scene(1, 5, P_DLY, 120);
+}
+
+/* P07: dub techno, dubbed out. A soft, muffled kick, a sine sub, and the minor 9 chord: low-passed, chorused, almost
+ * all of it in the delay and the reverb, an LFO breathing its filter; rims and blips thrown into the echoes, hiss */
+static void pat_dubspace(void)
+{
+    prm(0, SRC(KK_DECAY), 80); prm(0, SRC(KK_CLICK), 10); prm(0, SRC(KK_TONE), 30); prm(0, SRC(KK_SWEEP), 18);
+    prm(0, P_CUT, 64); prm(0, P_LEVEL, 106);
+    for (int s = 0; s < 16; s += 4) trig(0, s, 60, 112);
+    prm(1, SRC(HH_DECAY), 10); prm(1, SRC(HH_COLOR), 50); prm(1, SRC(HH_BRIGHT), 50); prm(1, P_LEVEL, 100);
+    prm(1, P_LOWCUT, 80); prm(1, P_DLY, 70); prm(1, P_REV, 40);
+    for (int s = 2; s < 16; s += 4) trig(1, s, 60, s == 14 ? 52 : 74);
+    prm(2, SRC(CP_DECAY), 10); prm(2, SRC(CP_BURSTS), 1); prm(2, SRC(CP_SPREAD), 0); prm(2, SRC(CP_TONE), 100);
+    prm(2, SRC(CP_ROOM), 30); prm(2, P_LEVEL, 90); prm(2, P_DLY, 110); prm(2, P_REV, 80); prm(2, P_PAN, -20);
+    trig(2, 12, 60, 90)->cond = TD_COND_P1 + 3; trig(2, 7, 60, 70)->cond = TD_COND_AB + 2;   /* 50 %, 1:3 */
+    prm(3, SRC(HH_DECAY), 8); prm(3, SRC(HH_COLOR), 120); prm(3, SRC(HH_BRIGHT), 40); prm(3, P_LEVEL, 76);
+    prm(3, P_LOWCUT, 100); prm(3, P_WIDTH, 120); prm(3, P_DLY, 30);
+    for (int s = 0; s < 16; s++) trig(3, s, 60, s % 4 == 2 ? 80 : 40);
+    tone(4, 0, 0, 0, 0); filt(4, 0, 40, 0, 0, 30, 0); amp(4, 0, 50, 40, 20);
+    prm(4, P_LEVEL, 108); prm(4, P_DUCK, 90); prm(4, P_LEN, 4);
+    trig(4, 2, 36, 100); trig(4, 10, 36, 90); trig(4, 14, 34, 76)->cond = TD_COND_AB + 0;
+    tone(5, 90, 30, 0, 0); filt(5, 0, 34, 60, 26, 26, 10); amp(5, 0, 18, 0, 30);
+    prm(5, SRC(SY_CHORD), 3); prm(5, P_CHO, 60); prm(5, P_DLY, 127); prm(5, P_REV, 90); prm(5, P_DUCK, 80);
+    prm(5, P_LEVEL, 120); prm(5, P_WIDTH, 100); prm(5, P_LEN, 2);
+    prm(5, P_LSPD, 4); prm(5, P_LMUL, 0); prm(5, P_LWAVE, 0); prm(5, P_LDEST, 9); prm(5, P_LDEPTH, 30);
+    P->length[5] = 32;
+    trig(5, 3, 48, 100); trig(5, 10, 48, 84); lock(5, 10, P_CUT, 44); trig(5, 19, 48, 96);
+    trig(5, 26, 53, 80)->cond = TD_COND_AB + 5;               /* (F minor 9, 1:4) */
+    trig(5, 30, 48, 60)->cond = TD_COND_P1 + 3;
+    fm_voice(6, 1, 10, 0, 20, 30); amp(6, 0, 10, 0, 10);       /* a sine drip for the echoes */
+    prm(6, P_LEVEL, 90); prm(6, P_DLY, 127); prm(6, P_REV, 70); prm(6, P_PAN, 30);
+    P->length[6] = 32;
+    trig(6, 7, 72, 80)->cond = TD_COND_AB + 0; trig(6, 23, 79, 70)->cond = TD_COND_P1 + 2;
+    prm(7, SRC(SM_SLOT), 4); prm(7, SRC(SM_LOOP), 1); prm(7, P_LEVEL, 50); prm(7, P_LOWCUT, 70);
+    prm(7, P_ASUS, 127); prm(7, P_LEN, 16);
+    trig(7, 0, 60, 100);
+    scene(0, 5, P_CUT, 20); scene(0, 0, P_LEVEL, 50); scene(0, 5, P_REV, 127); scene(0, 1, P_DLY, 120);
+    scene(1, 5, P_CUT, 72); scene(1, 5, P_RES, 90); scene(1, 5, P_FDRV, 60); scene(1, 2, P_DLY, 127);
+}
+
+/* P12: folktronic (after Four Tet's way of working: original notes). A warm four-on-the-floor kick, crisp shuffled
+ * hats, a 3-against-4 tambourine, a round gliding bass under Dm9 Bbmaj7 Fmaj7 Cadd9, a plucked FM harp on 13 steps
+ * (so it lands differently every bar), a pumping pad, a reversed chord swelling into every second bar */
+static const prog_t PROG_HAZE = {{38, 34, 41, 36}, {50, 46, 53, 48}, {3, 2, 2, 7}};
+static void pat_haze(void)
+{
+    prm(0, SRC(KK_DECAY), 54); prm(0, SRC(KK_CLICK), 30); prm(0, SRC(KK_TONE), 60); prm(0, SRC(KK_SWEEP), 30);
+    prm(0, SRC(KK_DRIVE), 30); prm(0, P_LEVEL, 108);
+    for (int s = 0; s < 16; s += 4) trig(0, s, 60, 116);
+    trig(0, 15, 60, 60)->cond = TD_COND_P1 + 1;
+    prm(1, SRC(HH_DECAY), 6); prm(1, SRC(HH_BRIGHT), 110); prm(1, SRC(HH_SPREAD), 60); prm(1, P_LEVEL, 112);
+    prm(1, P_PAN, 20); prm(1, P_LOWCUT, 95); prm(1, P_DLY, 20);
+    static const uint8_t hv[16] = {90, 40, 70, 52, 86, 36, 72, 58, 90, 44, 66, 50, 84, 38, 76, 62};
+    for (int s = 0; s < 16; s++) {
+        td_step_t *st = trig(1, s, 60, hv[s]);
+        if (s % 2) st->micro = 6;                               /* (the shuffle) */
+        if (s == 5 || s == 13) st->cond = TD_COND_P1 + 3;
+    }
+    prm(2, SRC(CP_DECAY), 30); prm(2, SRC(CP_SPREAD), 30); prm(2, SRC(CP_ROOM), 30); prm(2, P_LEVEL, 88);
+    prm(2, P_REV, 50);
+    trig(2, 4, 60, 100); trig(2, 12, 60, 104);
+    trig(2, 14, 60, 50)->cond = TD_COND_P1 + 2; trig(2, 7, 60, 44)->cond = TD_COND_AB + 5;
+    prm(3, SRC(HH_TUNE), 20); prm(3, SRC(HH_DECAY), 20); prm(3, SRC(HH_OPEN), 20); prm(3, SRC(HH_COLOR), 110);
+    prm(3, SRC(HH_BRIGHT), 120); prm(3, P_LEVEL, 90); prm(3, P_PAN, -30); prm(3, P_LOWCUT, 100);
+    P->length[3] = 12;
+    for (int s = 0; s < 12; s += 3) trig(3, s, 60, s ? 64 : 88)->micro = -2;
+    tone(4, 30, 0, 60, 0); filt(4, 0, 44, 20, 30, 20, 0); amp(4, 0, 34, 20, 12);
+    prm(4, SRC(SY_GLIDE), 20); prm(4, P_LEVEL, 108); prm(4, P_DUCK, 70); prm(4, P_LEN, 4);
+    P->length[4] = 64;
+    static const int boff[5] = {0, 3, 7, 10, 13}, bup[5] = {0, 0, 12, 7, 0};
+    for (int b = 0; b < 4; b++)
+        for (int i = 0; i < 5; i++) trig(4, b * 16 + boff[i], PROG_HAZE.bass[b] + bup[i], i ? 84 : 104);
+    fm_voice(5, 5, 50, 10, 18, 110); amp(5, 0, 26, 0, 30);     /* a plucked harp: ratio 3, the index dying fast */
+    prm(5, P_LEVEL, 116); prm(5, P_DLY, 70); prm(5, P_REV, 70);
+    prm(5, P_LSPD, 30); prm(5, P_LMUL, 1); prm(5, P_LWAVE, 0); prm(5, P_LDEST, 22); prm(5, P_LDEPTH, 30);   /* (it drifts L-R) */
+    P->length[5] = 13;
+    static const uint8_t harp[13] = {74, 77, 81, 79, 84, 81, 77, 86, 84, 79, 81, 74, 77};
+    static const uint8_t hvel[13] = {100, 70, 86, 64, 96, 72, 80, 90, 66, 84, 70, 92, 74};
+    for (int s = 0; s < 13; s++) trig(5, s, harp[s], hvel[s]);
+    td_set_machine_x(P, 6, TD_M_SYNTH); synth_pad(6);
+    prm(6, P_LEVEL, 50); prm(6, P_DUCK, 100); prm(6, P_REV, 90);
+    pad4(6, &PROG_HAZE, 84);
+    prm(7, SRC(SM_SLOT), 2); prm(7, SRC(SM_TUNE), 2); prm(7, SRC(SM_REV), 1); prm(7, P_LEVEL, 70); prm(7, P_REV, 90);
+    prm(7, P_LOWCUT, 60);
+    P->length[7] = 32;
+    trig(7, 21, 60, 100);                                      /* (1.2 s backwards: it ends on the next bar line) */
+    scene(0, 0, P_LOWCUT, 80); scene(0, 5, P_REV, 120); scene(0, 6, P_CUT, 30); scene(0, 4, P_CUT, 26);
+    scene(1, 5, SRC(FM_INDEX), 90); scene(1, 6, P_CUT, 90); scene(1, 5, P_DLY, 110); scene(1, 1, SRC(HH_DECAY), 14);
+}
+
 /* P05: electro. Broken kicks, a snare on 2 and 4, sixteenth hats, a square bass, an FM zap */
 static void pat_electro(void)
 {
@@ -1131,8 +1261,8 @@ void td_default_project(void)
     /* four of each, each at its tempo: house (left deck pads 1-4), techno (5-8), garage (right 1-4), drum & bass (5-8) */
     static const struct { void (*fill)(void); int bpm; } SET[TD_PATTERNS] = {
         {v_deep, 122}, {v_tech, 126}, {v_jackin, 124}, {v_afro, 122},
-        {v_techno, 130}, {v_acid, 132}, {v_dub, 122}, {v_melodic, 124},
-        {v_2step, 132}, {v_speed, 132}, {v_4x4, 132}, {v_bassline, 138},
+        {v_techno, 130}, {pat_micro, 124}, {pat_dubspace, 118}, {v_melodic, 124},
+        {v_2step, 132}, {v_speed, 132}, {v_4x4, 132}, {pat_haze, 130},
         {v_liquid, 174}, {v_neuro, 174}, {v_jungle, 165}, {v_roller, 172},
     };
     for (int p = 0; p < TD_PATTERNS; p++) {
@@ -1270,6 +1400,7 @@ static const struct { const char *name; void (*fill)(void); } PACKS[] = {
     {"LIQUID", v_liquid}, {"NEURO", v_neuro}, {"JUNGLE", v_jungle}, {"ROLLER", v_roller},
     {"MINIMAL", pat_minimal}, {"FILTER", pat_filter}, {"HARD", pat_hard}, {"PROG", pat_prog},
     {"DISCO", pat_disco}, {"BREAKS", pat_breaks}, {"ELECTRO", pat_electro}, {"POLYDUB", pat_dub},
+    {"MICRO", pat_micro}, {"DUBSPACE", pat_dubspace}, {"HAZE", pat_haze},
 };
 #define NPACKS ((int)(sizeof PACKS / sizeof PACKS[0]))
 

@@ -1139,7 +1139,7 @@ TEST(test_default_project)
         fotf += k;
     }
     check("four on the floor: the house and techno patterns (but dub's own) and three of the garage ones", fotf >= 10);
-    static const int tempos[16] = {122, 126, 124, 122, 130, 132, 122, 124, 132, 132, 132, 138, 174, 174, 165, 172};
+    static const int tempos[16] = {122, 126, 124, 122, 130, 124, 118, 124, 132, 132, 132, 130, 174, 174, 165, 172};
     int tok = 1;
     for (int p = 0; p < 16; p++) tok &= E.pat[p].bpm10 == tempos[p] * 10;
     check("each pattern has its tempo (house ~124, techno ~130, garage 132-138, drum & bass 165-174)", tok);
@@ -1196,8 +1196,8 @@ TEST(test_default_project)
 /* ---- sound packs */
 TEST(test_packs)
 {
-    check("27 packs, named", td_pack_count() == 27 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS")
-          && !strcmp(td_pack_name(15), "LIQUID") && !strcmp(td_pack_name(26), "POLYDUB"));
+    check("30 packs, named", td_pack_count() == 30 && !strcmp(td_pack_name(0), "808") && !strcmp(td_pack_name(2), "KEYS")
+          && !strcmp(td_pack_name(15), "LIQUID") && !strcmp(td_pack_name(26), "POLYDUB") && !strcmp(td_pack_name(29), "HAZE"));
     /* every pattern and pack: hats short (closed <= 18, open <= 36 with OPEN <= 30), no vocal sample (slot 1) */
     int hats = 1, vox = 0;
     td_init();

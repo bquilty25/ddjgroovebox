@@ -2,11 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Build the TRIGDECK engine (Sources/TrigCore, unchanged) to WebAssembly: web/trigcore.wasm.
 # Needs Homebrew's llvm, lld, wasi-libc and wasi-runtimes:  brew install llvm lld wasi-libc wasi-runtimes
+# Elsewhere (e.g. wasi-sdk on Linux, as the Pages workflow does) set CLANG, SYSROOT and BUILTINS.
 set -e
 cd "$(dirname "$0")/.."
-CLANG=/opt/homebrew/opt/llvm/bin/clang
-SYSROOT=/opt/homebrew/share/wasi-sysroot
-BUILTINS=$(ls /opt/homebrew/opt/wasi-runtimes/share/wasi-runtimes/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a)
+CLANG="${CLANG:-/opt/homebrew/opt/llvm/bin/clang}"
+SYSROOT="${SYSROOT:-/opt/homebrew/share/wasi-sysroot}"
+BUILTINS="${BUILTINS:-$(ls /opt/homebrew/opt/wasi-runtimes/share/wasi-runtimes/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a)}"
 EXPORTS=""
 # every engine call the app's actions use (as Sources/DDJGroovebox/TrigEngine.swift applies them)
 for f in td_play td_restart td_record td_tap_tempo td_fill td_set_tempo td_set_swing td_nudge \

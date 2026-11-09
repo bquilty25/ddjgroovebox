@@ -1,0 +1,69 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Publish TRIGDECK's web version to GitHub Pages: build the engine to WebAssembly (wasi-sdk), then lay out the files
+# the page loads at the same relative paths as in the repo (web/, docs/TRIGDECK.md for HELP, the Terminus font).
+name: Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      WASI_SDK: wasi-sdk-25.0-x86_64-linux
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install wasi-sdk
+        run: |
+          curl -sSL "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/$WASI_SDK.tar.gz" | tar xz -C "$RUNNER_TEMP"
+
+      - name: Build the engine
+        run: |
+          SDK="$RUNNER_TEMP/$WASI_SDK"
+          export CLANG="$SDK/bin/clang"
+          export SYSROOT="$SDK/share/wasi-sysroot"
+          export BUILTINS="$(find "$SDK/lib/clang" -path '*wasm32-unknown-wasip1/libclang_rt.builtins.a' | head -1)"
+          PATH="$SDK/bin:$PATH" sh web/build.sh
+
+      - name: Test the engine
+        run: node web/test_node.mjs && node --test web/test/*.test.mjs
+
+      - name: Lay out the site
+        run: |
+          mkdir -p _site/Sources/DDJGroovebox/Resources _site/docs
+          cp -R web _site/web
+          rm -rf _site/web/test _site/web/test_node.mjs _site/web/serve.py _site/web/serve.sh _site/web/build.sh _site/web/td_web.c
+          cp docs/TRIGDECK.md _site/docs/
+          cp Sources/DDJGroovebox/Resources/SLOOPTerminus.ttf _site/Sources/DDJGroovebox/Resources/
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <meta charset="utf-8">
+          <title>TRIGDECK</title>
+          <meta http-equiv="refresh" content="0; url=web/">
+          <a href="web/">TRIGDECK</a>
+          EOF
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

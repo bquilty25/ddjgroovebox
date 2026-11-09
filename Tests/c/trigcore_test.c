@@ -1343,12 +1343,20 @@ TEST(test_default_project)
     int all = 1;
     for (int t = 0; t < TD_TRACKS; t++) {
         td_init();
+        if (E.pat[0].machine[t] == TD_M_SAMPLE) continue;      /* (no default pattern plays a sample) */
         for (int u = 0; u < TD_TRACKS; u++) td_mute(u, u != t);
         td_play(1);
-        float p = td_render_offline((uint32_t)(N / 2));          /* four bars each (the vocal is on 3:4) */
+        float p = td_render_offline((uint32_t)(N / 2));          /* four bars each */
         if (p < 0.005f) { all = 0; printf("    track %d silent\n", t + 1); }
     }
-    check("every track of P01 plays", all);
+    check("every track of P01 but the SAMPLE track plays", all);
+    td_init();
+    int sample_steps = 0;
+    for (int p = 0; p < TD_PATTERNS; p++)
+        for (int t = 0; t < TD_TRACKS; t++)
+            for (int s = 0; s < TD_STEPS; s++)
+                if (E.pat[p].machine[t] == TD_M_SAMPLE && E.pat[p].step[t][s].trig) sample_steps++;
+    check("no default pattern plays a sample", sample_steps == 0);
 }
 
 /* ---- sound packs */
@@ -1387,6 +1395,9 @@ TEST(test_packs)
         int silent = 0;
         for (int t = 0; t < TD_TRACKS; t++) {                  /* every track of the house beat sounds with this kit */
             td_init();
+            int steps = 0;                                     /* (the pack keeps the steps: P01's SAMPLE track has none) */
+            for (int s = 0; s < TD_STEPS; s++) steps |= E.pat[0].step[t][s].trig;
+            if (!steps) continue;
             td_pack_load(k);
             for (int u = 0; u < TD_TRACKS; u++) td_mute(u, u != t);
             td_play(1);

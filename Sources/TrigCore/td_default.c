@@ -8,6 +8,7 @@
  *   garage  P09 2-STEP 132, P10 SPEED 132, P11 4X4 132, P12 BASSLINE 138
  *   d&b     P13 LIQUID 174, P14 NEURO 174, P15 JUNGLE 165, P16 ROLLER 172
  * The other kits (MINIMAL, FILTER, HARD, PROG, DISCO, BREAKS, ELECTRO) are sound packs only.
+ * No default pattern plays a sample: a SAMPLE track keeps its sound and has no steps (no_sample_steps, in build).
  *
  * Dub techno (P03), polymetric:
  *   deck A  1 KICK    deep, four on the floor, a 1:4 ghost; it ducks the sub and the stab (DUCK)
@@ -1248,12 +1249,21 @@ static void polish(td_pattern_t *p)
     }
 }
 
+/* The default patterns play no samples: a SAMPLE track keeps its sound (a pack or the user can still program it) but
+ * has no steps. (Only here: a pack changes the kit and never the steps.) */
+static void no_sample_steps(td_pattern_t *p)
+{
+    for (int t = 0; t < TD_TRACKS; t++)
+        if (p->machine[t] == TD_M_SAMPLE) memset(p->step[t], 0, sizeof p->step[t]);
+}
+
 static void build(int p, void (*fill)(void))
 {
     P = &E.pat[p];
     td_pattern_init_kit(P);
     fill();
     polish(P);
+    no_sample_steps(P);
 }
 
 void td_default_project(void)

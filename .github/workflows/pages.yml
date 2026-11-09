@@ -34,7 +34,9 @@ jobs:
           SDK="$RUNNER_TEMP/$WASI_SDK"
           export CLANG="$SDK/bin/clang"
           export SYSROOT="$SDK/share/wasi-sysroot"
-          export BUILTINS="$(find "$SDK/lib/clang" -path '*wasm32-unknown-wasip1/libclang_rt.builtins.a' | head -1)"
+          find "$SDK/lib/clang" -name 'libclang_rt.builtins*.a'
+          export BUILTINS="$(find "$SDK/lib/clang" -name 'libclang_rt.builtins*.a' | grep -v threads | grep -E 'wasip1|wasi/' | head -1)"
+          test -n "$BUILTINS" || { echo "no wasip1 builtins in $SDK"; exit 1; }
           PATH="$SDK/bin:$PATH" sh web/build.sh
 
       - name: Test the engine

@@ -30,11 +30,11 @@ Plug in the DDJ-400 before or after launching: it is found by name and reconnect
 
 ## How it is built
 
-| Part | What |
-| --- | --- |
-| `Sources/TrigCore` | the TRIGDECK engine (C, real time): machines, filters, envelopes, LFOs, the sequencer, scenes, decks with scratch buffers, performance and master FX, projects |
-| `Sources/SloopCore` | SLOOP's firmware (`vendor/sloop`, unmodified) compiled for the Mac against host versions of the FM-1's hardware, as upstream's own host tests do; a text tap reads what its screen says |
-| `Sources/DDJMapping` | pure Swift, unit tested: the DDJ-400's MIDI (codes from Mixxx's DDJ-400 mapping, checked on hardware), the TRIGDECK mapping and its control faces, the FM-1 panel mapping, the LED writer |
+| Part                     | What                                                                                                                                                                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Sources/TrigCore`     | the TRIGDECK engine (C, real time): machines, filters, envelopes, LFOs, the sequencer, scenes, decks with scratch buffers, performance and master FX, projects                                                                                             |
+| `Sources/SloopCore`    | SLOOP's firmware (`vendor/sloop`, unmodified) compiled for the Mac against host versions of the FM-1's hardware, as upstream's own host tests do; a text tap reads what its screen says                                                                  |
+| `Sources/DDJMapping`   | pure Swift, unit tested: the DDJ-400's MIDI (codes from Mixxx's DDJ-400 mapping, checked on hardware), the TRIGDECK mapping and its control faces, the FM-1 panel mapping, the LED writer                                                                  |
 | `Sources/DDJGroovebox` | the app: the drawn controller (faces, VoiceOver, tooltips), the strip above it, audio (restarts on device changes; a fallback clock keeps instruments running), CoreMIDI (the DDJ-400, other inputs, MIDI out stamped with the audio's clock), instruments |
 
 Projects are kept in `~/Library/Application Support/DDJGroovebox/` (`trigdeck.project`, `sloop-flash.bin`).

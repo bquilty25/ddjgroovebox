@@ -15,6 +15,8 @@ what it does and its value right now: the controller is the screen.
 
 Without a DDJ-400, click the drawing or play the Mac keyboard (laid out like the controller, see the guide).
 
+**Play it in a browser:** <https://bquilty25.github.io/ddjgroovebox/> (TRIGDECK only, see [web/README.md](web/README.md)).
+
 ## Build and run
 
 Needs macOS 14 or later and Xcode or the Command Line Tools (Swift 5.10+). The SLOOP cartridge also needs Python 3 with

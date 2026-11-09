@@ -155,20 +155,31 @@ const writer = new DDJ400LEDWriter();
 const ASK_400 = [0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x02, 0x06, 0x00, 0x03, 0x01, 0xF7];   // report your controls
 const FLX4_KEEPALIVE = [0xF0, 0x00, 0x40, 0x05, 0x00, 0x00, 0x04, 0x05, 0x00, 0x50, 0x02, 0xF7];   // (Mixxx's FLX4 script)
 
-async function startMIDI() {
-    if (!navigator.requestMIDIAccess) { problem = "THIS BROWSER HAS NO WEB MIDI: USE FIREFOX, CHROME OR EDGE (THE MOUSE AND KEYS WORK)"; return; }
+// Ask for MIDI straight from a click, before anything is awaited: Firefox shows its permission prompt (a site
+// permission add-on) only while the click still counts as the user's, and on a hosted page fetching the engine first
+// takes long enough for that to lapse.
+function requestMIDI() {
+    if (!navigator.requestMIDIAccess) return null;
+    return navigator.requestMIDIAccess({ sysex: true });
+}
+async function startMIDI(request) {
+    if (!request) { problem = "THIS BROWSER HAS NO WEB MIDI: USE FIREFOX, CHROME OR EDGE (THE MOUSE AND KEYS WORK)"; return; }
     let access;
-    try { access = await navigator.requestMIDIAccess({ sysex: true }); }
-    catch {
+    try { access = await request; }
+    catch (sysexErr) {
         try { access = await navigator.requestMIDIAccess(); }
-        catch {
+        catch (err) {
+            const why = (err?.message || sysexErr?.message || "").replace(/\s+/g, " ").trim();
             problem = /firefox/i.test(navigator.userAgent)
-                ? "FIREFOX REFUSED MIDI: IN ABOUT:CONFIG SET DOM.WEBMIDI.GATED TO FALSE, RELOAD, ALLOW (THE MOUSE AND KEYS WORK)"
-                : "MIDI NOT ALLOWED: ALLOW IT IN THE SITE SETTINGS AND RELOAD (THE MOUSE AND KEYS WORK)";
-            status(problem.toLowerCase(), true);
+                ? "FIREFOX REFUSED MIDI: PRESS MIDI (TOP LEFT) AND ALLOW THE SITE PERMISSION ADD-ON (THE MOUSE AND KEYS WORK)"
+                : "MIDI NOT ALLOWED: ALLOW IT IN THE SITE SETTINGS AND PRESS MIDI (THE MOUSE AND KEYS WORK)";
+            status(problem.toLowerCase() + (why ? ` [${why}]` : ""), true);
+            $("midi").hidden = false;
             return;
         }
     }
+    $("midi").hidden = true;
+    problem = null;
     const find = () => {
         const isDDJ = (p) => /DDJ-(400|FLX4)/i.test(p.name);
         const was = midiIn;
@@ -215,16 +226,19 @@ addEventListener("pagehide", () => {
 });
 
 // ---- the bar: start (audio needs a click), a new project, the project as a file
+$("midi").addEventListener("click", () => startMIDI(requestMIDI()));    // (a retry, in its own click)
 $("start").addEventListener("click", async () => {
     $("start").disabled = true;
     status("starting…");
+    let midi = null;
+    try { midi = requestMIDI(); midi?.catch(() => {}); } catch { /* (handled in startMIDI) */ }
     try {
         engine.onError = (msg) => { problem = msg.toUpperCase(); status(msg, true); };
         await engine.start();
         mapper = new TrigMapper(engine);
         $("overlay").remove();
         status("playing without a controller until MIDI is allowed");
-        startMIDI();                                          // (not awaited: the browser's permission prompt can wait)
+        startMIDI(midi);                                      // (not awaited: the browser's permission prompt can wait)
     } catch (err) {
         status("could not start: " + err, true);
         $("start").disabled = false;
